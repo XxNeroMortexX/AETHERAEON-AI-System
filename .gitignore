@@ -31,9 +31,7 @@ ENV/
 
 # MariaDB dumps (NEVER commit real data)
 *.sql
-!schema.sql
-!database/
-!database/*.sql
+!database/aetheraeon_schema.sql
 
 # =========================
 # CHROMA / VECTOR MEMORY
