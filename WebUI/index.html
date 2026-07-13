@@ -1,0 +1,979 @@
+<!--
+==========================================================
+Aetheraeon AI
+WebUI/index.html
+
+Purpose:
+Main frontend HTML structure.
+
+Architecture:
+Static frontend served by Flask/Apache.
+
+Related files:
+- css/aetheraeon.css
+- js/aetheraeon.js
+
+==========================================================
+-->
+
+<!--
+==========================================================
+AETHERAEON HTML INDEX
+
+HTML-001 Page Structure
+HTML-002 Header / Navigation
+HTML-003 Authentication Area
+HTML-004 Main Application Layout
+HTML-005 Chat Interface
+HTML-006 Message Display
+HTML-007 Input Controls
+HTML-008 Greeting Panel
+HTML-009 Settings
+HTML-010 Modals / Popups
+
+==========================================================
+-->
+
+<!-- HTML-001: Page Structure -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Aetheraeon AI is a self-hosted personal AI assistant with local LLM, memory, personality, conversation, and automation features."
+    />
+    <meta name="author" content="Aetheraeon AI project" />
+    <meta name="application-name" content="Aetheraeon AI" />
+    <meta
+      name="keywords"
+      content="Aetheraeon AI, personal AI assistant, self hosted AI assistant, local AI assistant, private AI assistant, AI memory system, AI personality system, local LLM assistant, Ollama AI, conversational AI, AI automation system"
+    />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Aetheraeon AI" />
+    <meta property="og:title" content="Aetheraeon AI — Self-Hosted Personal AI Assistant" />
+    <meta
+      property="og:description"
+      content="A private, self-hosted AI assistant with local LLM integration, persistent memory, configurable personality, conversations, and automation tools."
+    />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Aetheraeon AI — Self-Hosted Personal AI Assistant" />
+    <meta
+      name="twitter:description"
+      content="A private, self-hosted AI assistant with local LLM integration, persistent memory, personality, and automation features."
+    />
+
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>Aetheraeon AI — Self-Hosted Personal AI Assistant</title>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Aetheraeon AI",
+        "description": "A self-hosted personal AI assistant with local LLM integration, persistent memory, configurable personality, conversation management, and automation tools.",
+        "applicationCategory": "ProductivityApplication",
+        "operatingSystem": "Windows",
+        "softwareRequirements": "Python, MariaDB, and Ollama"
+      }
+    </script>
+
+    <link rel="stylesheet" href="/css/aetheraeon.css" />
+  </head>
+  <body>
+    <!-- HTML-003: Authentication Area -->
+    <!--
+    AUTHENTICATION AREA
+
+    Purpose:
+    Collects login or registration details and displays backend availability.
+
+    Related JavaScript:
+    switchTab(), submitAuth(), checkBackendAvailability()
+    -->
+    <div id="login-screen">
+      <div class="login-box">
+        <h1 class="login-logo">⚡ AETHERAEON</h1>
+        <div class="login-sub">AI SYSTEM CONTROLLER</div>
+
+        <div class="login-tabs">
+          <button class="login-tab active" id="tab-login" onclick="switchTab('login')">
+            Login
+          </button>
+          <button class="login-tab" id="tab-register" onclick="switchTab('register')">
+            Create Account
+          </button>
+        </div>
+
+        <div class="login-field">
+          <label for="auth-email">EMAIL</label>
+          <input type="email" id="auth-email" placeholder="user@example.com" autocomplete="email" />
+        </div>
+        <div class="login-field">
+          <label for="auth-password">PASSWORD</label>
+          <div class="pw-wrap">
+            <input
+              type="password"
+              id="auth-password"
+              placeholder="••••••••"
+              autocomplete="current-password"
+            />
+            <button
+              class="pw-eye"
+              type="button"
+              onclick="togglePw('auth-password', this)"
+              title="Show password"
+              aria-label="Show password"
+            ></button>
+          </div>
+        </div>
+        <!-- Register-only fields -->
+        <div class="login-field" id="reg-fullname-field">
+          <label for="auth-fullname">FULL NAME</label>
+          <input type="text" id="auth-fullname" placeholder="e.g. James Smith" />
+        </div>
+        <div class="login-field" id="reg-username-field">
+          <label for="auth-username">USERNAME</label>
+          <input type="text" id="auth-username" placeholder="e.g. james123" />
+        </div>
+
+        <div class="login-err" id="auth-err" role="alert" aria-live="polite"></div>
+        <div id="backend-status" class="backend-status visible" role="status" aria-live="polite">
+          Checking Aetheraeon AI server availability…
+        </div>
+        <button
+          class="login-btn"
+          id="auth-submit-btn"
+          onclick="submitAuth()"
+          disabled
+          aria-disabled="true"
+          title="Checking server availability"
+        >
+          Sign In
+        </button>
+        <div class="login-switch" id="login-switch-text">
+          No account? <span onclick="switchTab('register')">Create one</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML-010: Modals / Popups -->
+    <!-- Transient status and modal containers controlled by frontend event handlers. -->
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <!-- ============================================================
+     VOICE INDICATOR
+     ============================================================ -->
+    <div id="voice-indicator" role="status" aria-live="polite">🎤 Listening…</div>
+
+    <!-- ============================================================
+     USER CONTEXT MENU
+     ============================================================ -->
+    <div id="user-menu">
+      <div class="user-menu-item" onclick="openSettings('profile')">👤 Profile</div>
+      <div class="user-menu-item" onclick="openSettings('account')">⚙️ Account Settings</div>
+      <div class="user-menu-item" onclick="openSettings('themes')">🎨 Themes</div>
+      <div class="user-menu-item" onclick="openSettings('models')">🧠 Models</div>
+      <div class="user-menu-sep"></div>
+      <div class="user-menu-item danger" onclick="logout()">🚪 Logout</div>
+    </div>
+
+    <!-- ============================================================
+     SEARCH OVERLAY
+     ============================================================ -->
+    <div
+      id="search-overlay"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search conversations"
+      onclick="closeSearchIfOutside(event)"
+    >
+      <div class="search-box">
+        <button class="search-close" onclick="closeSearch()" aria-label="Close search">✕</button>
+        <input
+          type="text"
+          id="search-input"
+          aria-label="Search all conversations"
+          placeholder="Search all chats…"
+          oninput="debounceSearch()"
+        />
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </div>
+
+    <!-- Share/export dialog. Content is populated by openShareModal(). -->
+    <div
+      id="share-modal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Share conversation"
+      onclick="closeModalIfOutside(event, 'share-modal')"
+    >
+      <div class="modal-box">
+        <div class="modal-title">📤 Share</div>
+        <div class="modal-sub" id="share-sub">Choose how to share</div>
+        <div class="share-opts">
+          <div class="share-opt" onclick="doShare('copy')">
+            <span class="share-opt-icon">📋</span><span>Copy to clipboard</span>
+          </div>
+          <div class="share-opt" onclick="doShare('file')">
+            <span class="share-opt-icon">📁</span><span>Export as .txt file</span>
+          </div>
+          <div class="share-opt" onclick="doShare('native')">
+            <span class="share-opt-icon">📱</span><span>Device share sheet</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn" onclick="closeModal('share-modal')">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ChromaDB Memory Manager Modal ─────────────────────────── -->
+    <div
+      id="mem-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mem-title"
+      onclick="memCloseIfOutside(event)"
+    >
+      <div id="mem-panel">
+        <!-- ── Header ─────────────────────────────────────────────── -->
+        <div id="mem-header">
+          <span id="mem-title">🧠 ChromaDB Memory Manager</span>
+          <span id="mem-count-badge">Loading…</span>
+
+          <!-- Close button -->
+          <button class="mem-tool-btn" onclick="closeMemModal()" title="Close">✕ Close</button>
+        </div>
+
+        <!-- ── Toolbar ────────────────────────────────────────────── -->
+        <div id="mem-toolbar">
+          <!-- Semantic search input -->
+          <input
+            type="text"
+            id="mem-search-input"
+            aria-label="Search memories"
+            placeholder="Search memories… (AI semantic search)"
+            title="Automatically searches memory using AI similarity"
+            onkeydown="memSearchKeydown(event)"
+            oninput="memFilterRows()"
+          />
+
+          <!-- Type filter -->
+          <select
+            id="mem-type-filter"
+            aria-label="Filter memories by type"
+            onchange="memFilterRows()"
+            title="Filter by memory type"
+          >
+            <option value="">All Types</option>
+            <option value="user_fact">user_fact</option>
+            <option value="navigation">navigation</option>
+            <option value="code_edit">code_edit</option>
+            <option value="playbook">playbook</option>
+            <option value="shortcut">shortcut</option>
+            <option value="config">config</option>
+            <option value="conversation">conversation</option>
+            <option value="n8n">n8n</option>
+            <option value="system_event">system_event</option>
+            <option value="preference">preference</option>
+            <option value="general">general</option>
+          </select>
+
+          <!-- Sort -->
+          <select
+            id="mem-sort-select"
+            aria-label="Sort memories"
+            onchange="memApplySort()"
+            title="Sort by column"
+          >
+            <option value="timestamp-desc">Newest First</option>
+            <option value="timestamp-asc">Oldest First</option>
+            <option value="type-asc">Type A→Z</option>
+            <option value="type-desc">Type Z→A</option>
+            <option value="content-asc">Content A→Z</option>
+            <option value="source-asc">Source A→Z</option>
+          </select>
+        </div>
+
+        <div id="mem-toolbar">
+          <!-- Action buttons -->
+          <button
+            class="mem-tool-btn primary"
+            onclick="openMemCreate()"
+            title="Add a new memory entry"
+          >
+            + New Memory
+          </button>
+          <button class="mem-tool-btn" onclick="memLoad()" title="Refresh from ChromaDB">
+            ↻ Refresh
+          </button>
+          <button
+            class="mem-tool-btn"
+            onclick="memSemanticSearch()"
+            title="Run semantic similarity search with the text in the search box"
+          >
+            🔍 Semantic
+          </button>
+          <button
+            class="mem-tool-btn"
+            onclick="memExportSQL()"
+            title="Export all memories as a MySQL INSERT file"
+          >
+            ⬇ Export SQL
+          </button>
+          <button
+            class="mem-tool-btn"
+            onclick="memExportJSON()"
+            title="Export all memories as JSON"
+          >
+            ⬇ Export JSON
+          </button>
+          <!-- Hidden file input -- triggered by the Import button below.
+           Accepts .json and .sql files.  The actual parsing is done
+           in JavaScript based on file extension. -->
+          <input
+            type="file"
+            id="mem-import-file"
+            accept=".json,.sql"
+            onchange="memImportFile(event)"
+          />
+          <button
+            class="mem-tool-btn"
+            onclick="document.getElementById('mem-import-file').click()"
+            title="Import memories from a previously exported JSON or SQL file"
+          >
+            Import
+          </button>
+          <button
+            class="mem-tool-btn danger"
+            onclick="memDeleteSelected()"
+            title="Delete all selected rows"
+            id="mem-del-sel-btn"
+          >
+            🗑 Delete Selected
+          </button>
+        </div>
+
+        <!-- ── Table ──────────────────────────────────────────────── -->
+        <div id="mem-table-wrap">
+          <table id="mem-table">
+            <thead>
+              <tr>
+                <!-- Select all checkbox -->
+                <th>
+                  <input
+                    type="checkbox"
+                    class="mem-checkbox"
+                    id="mem-check-all"
+                    aria-label="Select or deselect all memories"
+                    onchange="memToggleAll(this)"
+                    title="Select / deselect all"
+                  />
+                </th>
+                <th onclick="memSortByCol('type')" title="Sort by type">
+                  Type <span class="sort-arrow">↕</span>
+                </th>
+                <th
+                  onclick="memSortByCol('content')"
+                  title="Sort by content — click row content to expand/collapse"
+                >
+                  Content <span class="sort-arrow">↕</span>
+                </th>
+                <th onclick="memSortByCol('timestamp')" title="Sort by date">
+                  Timestamp <span class="sort-arrow">↕</span>
+                </th>
+                <th onclick="memSortByCol('source')" title="Sort by source">
+                  Source <span class="sort-arrow">↕</span>
+                </th>
+                <th>Actions</th>
+                <th onclick="memSortByCol('id')" title="Full UUID">
+                  ID <span class="sort-arrow">↕</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="mem-tbody">
+              <tr class="mem-state-row">
+                <td colspan="7">Loading memories…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- ── Status bar ─────────────────────────────────────────── -->
+        <div id="mem-statusbar">
+          <span id="mem-total-count">0 records</span>
+          <span id="mem-visible-count"></span>
+          <span id="mem-sel-count"></span>
+          <span id="mem-load-msg"></span>
+          <span></span>
+          <span>
+            Tip: Click content cell to expand · Click row to select · Shift+click for range
+          </span>
+        </div>
+      </div>
+      <!-- /mem-panel -->
+    </div>
+    <!-- /mem-modal -->
+
+    <!-- ── Edit / Create Memory Sub-Modal ─────────────────────────── -->
+    <div
+      id="mem-edit-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mem-edit-title"
+      onclick="memEditCloseIfOutside(event)"
+    >
+      <div id="mem-edit-box">
+        <div id="mem-edit-title">✏️ Edit Memory</div>
+        <div id="mem-edit-id-disp"></div>
+
+        <!-- Content textarea -->
+        <div>
+          <label for="mem-edit-content">CONTENT</label>
+          <textarea id="mem-edit-content" placeholder="Memory text…"></textarea>
+        </div>
+
+        <!-- Type + Source row -->
+        <div class="mem-edit-row">
+          <div>
+            <label for="mem-edit-type">TYPE</label>
+            <select id="mem-edit-type">
+              <option value="user_fact">user_fact</option>
+              <option value="navigation">navigation</option>
+              <option value="code_edit">code_edit</option>
+              <option value="playbook">playbook</option>
+              <option value="shortcut">shortcut</option>
+              <option value="config">config</option>
+              <option value="conversation">conversation</option>
+              <option value="n8n">n8n</option>
+              <option value="system_event">system_event</option>
+              <option value="preference">preference</option>
+              <option value="general">general</option>
+            </select>
+          </div>
+          <div>
+            <label for="mem-edit-source">SOURCE</label>
+            <input
+              type="text"
+              id="mem-edit-source"
+              placeholder="user / system / api…"
+              value="user"
+            />
+          </div>
+        </div>
+
+        <div class="mem-edit-err" id="mem-edit-err"></div>
+
+        <!-- Action buttons -->
+        <div class="mem-edit-actions">
+          <button class="mem-tool-btn" onclick="closeMemEdit()">Cancel</button>
+          <button class="mem-tool-btn primary" onclick="memSaveEdit()" id="mem-save-btn">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML-009: Settings -->
+    <!-- Settings panels preserve server-backed profile, account, model, and personality controls. -->
+    <div
+      id="settings-modal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Aetheraeon settings"
+      onclick="closeModalIfOutside(event, 'settings-modal')"
+    >
+      <div class="modal-box">
+        <div class="modal-title">⚙️ Settings</div>
+
+        <div class="settings-tabs">
+          <button
+            class="settings-tab"
+            data-panel="personality"
+            onclick="switchSettingsTab('personality')"
+          >
+            Personality
+          </button>
+          <button
+            class="settings-tab active"
+            data-panel="themes"
+            onclick="switchSettingsTab('themes')"
+          >
+            🎨 Theme
+          </button>
+          <button class="settings-tab" data-panel="profile" onclick="switchSettingsTab('profile')">
+            👤 Profile
+          </button>
+          <button class="settings-tab" data-panel="account" onclick="switchSettingsTab('account')">
+            🔐 Account
+          </button>
+          <button class="settings-tab" data-panel="models" onclick="switchSettingsTab('models')">
+            🧠 Models
+          </button>
+        </div>
+
+        <!-- Theme panel -->
+        <div class="settings-panel active" id="panel-themes">
+          <div class="modal-sub">Select a color theme</div>
+          <div class="theme-grid">
+            <button class="theme-btn active" data-theme="dark" onclick="applyTheme('dark')">
+              🌑 Dark (Default)
+            </button>
+            <button class="theme-btn" data-theme="light" onclick="applyTheme('light')">
+              ☀️ Light
+            </button>
+            <button class="theme-btn" data-theme="midnight" onclick="applyTheme('midnight')">
+              🌌 Midnight
+            </button>
+            <button class="theme-btn" data-theme="matrix" onclick="applyTheme('matrix')">
+              💚 Matrix
+            </button>
+          </div>
+          <div>Theme is saved and remembered across sessions.</div>
+        </div>
+
+        <!-- Profile panel -->
+        <div class="settings-panel" id="panel-profile">
+          <div class="modal-field">
+            <label for="new-username-input">USERNAME</label>
+            <input type="text" id="new-username-input" placeholder="Username" />
+          </div>
+          <div class="modal-field">
+            <label for="full-name-input">FULL NAME</label>
+            <input type="text" id="full-name-input" placeholder="Full name" />
+          </div>
+          <div class="modal-field">
+            <label for="profile-current-pw-input">CURRENT PASSWORD</label>
+            <div class="pw-wrap">
+              <input type="password" id="profile-current-pw-input" placeholder="Current password" />
+              <button
+                class="pw-eye"
+                type="button"
+                onclick="togglePw('profile-current-pw-input', this)"
+                title="Show password"
+              ></button>
+            </div>
+          </div>
+          <div class="modal-err" id="username-err"></div>
+          <div class="modal-ok" id="username-ok"></div>
+          <div class="modal-actions">
+            <button class="modal-btn primary" onclick="saveProfile()">Save Profile</button>
+          </div>
+          <div>Your current password is required. Usernames must be unique.</div>
+        </div>
+
+        <!-- Account panel -->
+        <div class="settings-panel" id="panel-account">
+          <div class="modal-sub">Update your email or password</div>
+          <div class="modal-field">
+            <label for="account-email-input">EMAIL</label>
+            <input type="email" id="account-email-input" placeholder="Email address" />
+          </div>
+          <div class="modal-field">
+            <label for="current-pw-input">CURRENT PASSWORD</label>
+            <div class="pw-wrap">
+              <input type="password" id="current-pw-input" placeholder="Current password" />
+              <button
+                class="pw-eye"
+                type="button"
+                onclick="togglePw('current-pw-input', this)"
+                title="Show password"
+              ></button>
+            </div>
+          </div>
+          <div class="modal-field">
+            <label for="new-pw-input">NEW PASSWORD</label>
+            <div class="pw-wrap">
+              <input type="password" id="new-pw-input" placeholder="New password (min 6 chars)" />
+              <button
+                class="pw-eye"
+                type="button"
+                onclick="togglePw('new-pw-input', this)"
+                title="Show password"
+              ></button>
+            </div>
+          </div>
+          <div class="modal-err" id="pw-err"></div>
+          <div class="modal-ok" id="pw-ok"></div>
+          <div class="modal-actions">
+            <button class="modal-btn primary" onclick="saveAccount()">Save Account</button>
+          </div>
+
+          <div></div>
+          <div class="modal-sub">⚠️ Danger Zone</div>
+          <div>
+            Deleting your account removes all your conversations, messages, and data permanently.
+          </div>
+          <div class="modal-field">
+            <label for="delete-account-pw">CONFIRM PASSWORD TO DELETE ACCOUNT</label>
+            <div class="pw-wrap">
+              <input type="password" id="delete-account-pw" placeholder="Your password" />
+              <button
+                class="pw-eye"
+                type="button"
+                onclick="togglePw('delete-account-pw', this)"
+                title="Show password"
+              ></button>
+            </div>
+          </div>
+          <div class="modal-err" id="delete-err"></div>
+          <div class="modal-actions">
+            <button class="modal-btn danger" onclick="deleteAccount()">Delete My Account</button>
+          </div>
+        </div>
+
+        <!-- Models panel -->
+        <div class="settings-panel" id="panel-models">
+          <div class="modal-sub">Set preferred AI models</div>
+          <div class="modal-field">
+            <label for="pref-router-model">ROUTER MODEL</label>
+            <select id="pref-router-model"></select>
+          </div>
+          <div class="modal-field">
+            <label for="pref-chat-model">CHAT MODEL</label>
+            <select id="pref-chat-model"></select>
+          </div>
+          <div class="modal-field">
+            <label for="pref-code-model">CODE MODEL</label>
+            <select id="pref-code-model"></select>
+          </div>
+          <div class="modal-ok" id="models-ok"></div>
+          <div class="modal-actions">
+            <button class="modal-btn primary" onclick="saveModelSettings()">Save Models</button>
+          </div>
+          <div>Selections are limited to models currently installed in Ollama.</div>
+          <div></div>
+          <div class="modal-sub">Web Search</div>
+          <div>
+            <!-- --------------------------------------------------------
+             WEB SEARCH TOGGLE
+             When ON: web search always runs before every AI response
+             to inject current context into the prompt.
+             When OFF: web search only runs automatically if there is
+             no memory context available for the question.
+             -------------------------------------------------------- -->
+            <label for="web-search-toggle">ALWAYS SEARCH WEB</label>
+            <input
+              type="checkbox"
+              id="web-search-toggle"
+              onchange="saveWebSearchToggle(this.checked)"
+            />
+          </div>
+          <div>
+            OFF: web search only runs when no memory context exists. ON: web search always runs
+            before every response.
+          </div>
+        </div>
+
+        <div class="settings-panel" id="panel-personality">
+          <div class="modal-sub">Customize how Aetheraeon communicates</div>
+          <div class="modal-field">
+            <label for="personality-style">PERSONALITY STYLE</label>
+            <select id="personality-style">
+              <option value="balanced">Balanced</option>
+              <option value="friendly">Friendly</option>
+              <option value="professional">Professional</option>
+              <option value="casual">Casual</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label for="response-tone">TONE</label>
+            <select id="response-tone">
+              <option value="direct">Direct</option>
+              <option value="friendly">Friendly</option>
+              <option value="formal">Formal</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label for="response-detail">VERBOSITY</label>
+            <select id="response-detail">
+              <option value="brief">Brief</option>
+              <option value="normal">Normal</option>
+              <option value="detailed">Detailed</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label for="humor-level">HUMOR</label>
+            <select id="humor-level">
+              <option value="none">None</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label for="greeting-style">GREETING STYLE</label>
+            <select id="greeting-style">
+              <option value="minimal">Minimal</option>
+              <option value="friendly">Friendly</option>
+              <option value="conversational">Conversational</option>
+            </select>
+          </div>
+          <div class="modal-sub">Custom Personality Traits</div>
+          <div id="personality-traits-preview">No custom traits.</div>
+          <button class="modal-btn" onclick="openPersonalityManager()">Manage Traits</button>
+          <div class="modal-err" id="personality-err"></div>
+          <div class="modal-ok" id="personality-ok"></div>
+          <div class="modal-actions">
+            <button class="modal-btn primary" onclick="savePersonalitySettings()">
+              Save Personality
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="modal-btn" onclick="closeModal('settings-modal')">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="personality-manager-modal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Manage personality traits"
+      onclick="closeModalIfOutside(event, 'personality-manager-modal')"
+    >
+      <div class="modal-box">
+        <div class="modal-title">Custom Personality Traits</div>
+        <div id="personality-traits-list"></div>
+        <div class="modal-field">
+          <label for="new-personality-trait">NEW TRAIT</label
+          ><input id="new-personality-trait" maxlength="255" placeholder="e.g. Likes examples" />
+        </div>
+        <div class="modal-err" id="trait-manager-err"></div>
+        <div class="modal-actions">
+          <button class="modal-btn" onclick="closeModal('personality-manager-modal')">Close</button>
+          <button class="modal-btn primary" onclick="addPersonalityTrait()">+ Add Trait</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+     PLAYBOOK MODAL (create/edit)
+     ============================================================ -->
+    <div
+      id="playbook-modal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pb-modal-title"
+      onclick="closeModalIfOutside(event, 'playbook-modal')"
+    >
+      <div class="modal-box">
+        <div class="modal-title" id="pb-modal-title">📋 New Playbook</div>
+        <div class="modal-field">
+          <label for="pb-name-input">PLAYBOOK NAME</label>
+          <input type="text" id="pb-name-input" placeholder="e.g. Morning Startup" />
+        </div>
+        <div class="modal-field">
+          <label for="pb-desc-input">DESCRIPTION (optional)</label>
+          <input type="text" id="pb-desc-input" placeholder="What does this playbook do?" />
+        </div>
+        <div>STEPS</div>
+        <div class="pb-step-list" id="pb-step-list"></div>
+        <button class="modal-btn" onclick="addPlaybookStep()">+ Add Step</button>
+        <div class="modal-err" id="pb-err"></div>
+        <div class="modal-actions">
+          <button class="modal-btn" onclick="closeModal('playbook-modal')">Cancel</button>
+          <button class="modal-btn primary" onclick="savePlaybook()">Save Playbook</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML-004: Main Application Layout -->
+    <!--
+    MAIN APPLICATION SHELL
+
+    Purpose:
+    Hosts navigation, conversation controls, chat history, and message input after authentication.
+    -->
+    <div id="app">
+      <!-- Mobile sidebar backdrop (tap to close drawer) -->
+      <div id="sidebar-backdrop" onclick="closeSidebarDrawer()"></div>
+
+      <!-- ── SIDEBAR ──────────────────────────────────────────── -->
+      <div id="sidebar" class="collapsed">
+        <div class="sidebar-header">
+          <span class="sidebar-title">💬 CHATS</span>
+          <button class="sb-icon-btn" title="New Conversation" onclick="newConversation()">
+            ＋
+          </button>
+          <button class="sb-icon-btn" title="Search all chats" onclick="openSearch()">🔍</button>
+          <button class="sb-icon-btn" title="Export all" onclick="exportAllConversations()">
+            ⬇
+          </button>
+          <button
+            class="sb-icon-btn"
+            id="sidebar-close-btn"
+            onclick="closeSidebarDrawer()"
+            title="Close sidebar"
+          >
+            X
+          </button>
+        </div>
+
+        <div class="sidebar-search">
+          <input
+            type="text"
+            id="conv-filter-input"
+            aria-label="Filter conversations"
+            placeholder="Filter chats…"
+            oninput="filterConvList()"
+          />
+        </div>
+
+        <div class="sidebar-nav">
+          <button class="sidebar-nav-btn active" id="nav-chats" onclick="switchSidebarTab('chats')">
+            CHATS
+          </button>
+          <button
+            class="sidebar-nav-btn"
+            id="nav-playbooks"
+            onclick="switchSidebarTab('playbooks')"
+          >
+            PLAYBOOKS
+          </button>
+        </div>
+
+        <!-- CONVERSATION LIST -->
+        <div id="conv-list"></div>
+
+        <!-- PLAYBOOK LIST -->
+        <div id="playbook-list">
+          <div class="pb-new-btn" onclick="openPlaybookModal()">＋ New Playbook</div>
+          <div id="pb-items"></div>
+        </div>
+
+        <!-- USER FOOTER -->
+        <div class="sidebar-footer">
+          <div class="user-badge clickable" onclick="toggleUserMenu(event)" title="Account options">
+            <div class="user-avatar" id="user-avatar">?</div>
+            <div class="user-info">
+              <div class="user-name" id="user-display-name">—</div>
+              <div class="user-email" id="user-display-email">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MAIN ─────────────────────────────────────────────── -->
+      <div id="main">
+        <!-- HTML-002: Header / Navigation -->
+        <header>
+          <button
+            class="toggle-sidebar"
+            onclick="toggleSidebar()"
+            title="Toggle sidebar"
+            aria-label="Toggle conversation sidebar"
+          >
+            ☰
+          </button>
+          <div class="logo">⚡ AETHERAEON</div>
+          <div>v<span id="app-version">?</span></div>
+
+          <input
+            class="conv-title-input"
+            id="conv-title-input"
+            onblur="finishRename()"
+            onkeydown="titleKeydown(event)"
+            placeholder="Rename…"
+          />
+          <span
+            class="conv-title-display"
+            id="conv-title-display"
+            onclick="startRename()"
+            title="Click to rename"
+            >New Conversation</span
+          >
+
+          <div class="header-right">
+            <div
+              class="status-dots"
+              id="status-dots"
+              role="status"
+              aria-live="polite"
+              aria-label="Service status"
+            ></div>
+            <button class="h-btn" onclick="openSearch()">🔍 Search</button>
+            <button class="h-btn" onclick="shareConversation()">📤 Share</button>
+            <button class="h-btn hide-mobile" onclick="copyConversation()">📋 Copy</button>
+            <button class="h-btn hide-mobile" onclick="exportConversation()">⬇ Export</button>
+            <button class="h-btn" onclick="openMemModal()" title="Manage ChromaDB long-term memory">
+              🧠 Memory
+            </button>
+            <button class="h-btn" onclick="openSettings('themes')">⚙️ Settings</button>
+          </div>
+        </header>
+
+        <!-- HTML-005: Chat Interface -->
+        <!-- HTML-006: Message Display -->
+        <!-- HTML-008: Greeting Panel -->
+        <!--
+        CHAT MESSAGE CONTAINER
+
+        Purpose:
+        Displays database-backed conversation history, temporary greetings, and new responses.
+
+        Used by:
+        JavaScript message and greeting renderers.
+
+        Related JavaScript:
+        addMsgDOM(), loadAndRenderMessages(), renderTemporaryGreeting()
+        -->
+        <div id="chat" role="log" aria-live="polite" aria-label="Conversation messages"></div>
+
+        <!-- Quick commands bar -->
+        <div id="quick-bar">
+          <button class="qbtn" data-cmd="help">❓ help</button>
+          <button class="qbtn" data-cmd="status">📡 status</button>
+          <button class="qbtn" data-cmd="memory list">🧠 memory</button>
+          <button class="qbtn" data-cmd="memory list user_fact">👤 user facts</button>
+          <button class="qbtn" data-cmd="memory list navigation">📁 nav history</button>
+          <button class="qbtn" data-cmd="list playbooks">📋 playbooks</button>
+          <button class="qbtn" data-cmd="show personality">🎭 personality</button>
+          <button class="qbtn" data-cmd="memory recall last_path">📍 last path</button>
+          <button class="qbtn" data-cmd="what have I been working on">🔍 history</button>
+          <button class="qbtn" data-cmd="memory types">🏷 types</button>
+        </div>
+
+        <!-- HTML-007: Input Controls -->
+        <div id="input-row">
+          <textarea
+            id="msg-input"
+            rows="1"
+            placeholder="Type a message… (Enter to send, Shift+Enter for newline, ↑↓ for history)"
+            aria-label="Message Aetheraeon"
+          ></textarea>
+          <button
+            id="voice-btn"
+            title="Voice input"
+            aria-label="Start voice input"
+            onclick="toggleVoice()"
+          >
+            🎤
+          </button>
+          <button id="send-btn">Send</button>
+        </div>
+      </div>
+      <!-- /main -->
+    </div>
+    <!-- /app -->
+
+    <div class="cursor" id="cursor"></div>
+
+    <script src="/js/aetheraeon.js"></script>
+  </body>
+</html>

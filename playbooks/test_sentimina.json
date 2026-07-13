@@ -1,0 +1,30 @@
+{
+  "name": "test_sentimina",
+  "description": "Tests open, list, shell, and chat steps — use this to verify everything works",
+  "steps": [
+    {
+      "action": "chat",
+      "message": "Step 1: Starting test playbook..."
+    },
+    {
+      "action": "open",
+      "target": "H:\\MQ2_Project"
+    },
+    {
+      "action": "wait",
+      "target": "2"
+    },
+    {
+      "action": "list",
+      "target": "H:\\MQ2_Project"
+    },
+    {
+      "action": "shell",
+      "target": "dir H:\\MQ2_Project\\E3 /w"
+    },
+    {
+      "action": "chat",
+      "message": "All steps complete. Sentimina is working correctly."
+    }
+  ]
+}

@@ -1,0 +1,3142 @@
+/*
+==========================================================
+Aetheraeon AI
+Frontend Styling
+
+Purpose:
+UI layout, themes, animations,
+and visual presentation.
+
+==========================================================
+*/
+
+/*
+==========================================================
+AETHERAEON CSS INDEX
+
+CSS-001 Global Variables
+CSS-002 Base Styles
+CSS-003 Layout
+CSS-004 Navigation
+CSS-005 Chat
+CSS-006 Messages
+CSS-007 Input Area
+CSS-008 Greeting Panel
+CSS-009 Animations
+CSS-010 Settings
+CSS-011 Responsive Design
+
+==========================================================
+*/
+
+/* CSS-001: Global Variables */
+
+/* ── CSS Variables (Dark theme — default) ─────────────────── */
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2330;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #7d8590;
+  --accent: #58a6ff;
+  --green: #3fb950;
+  --red: #f85149;
+  --orange: #d29922;
+  --purple: #bc8cff;
+  --tag-bg: #1f2937;
+  --you-bubble: #1f3a5f;
+  --sidebar-w: 260px;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --radius: 8px;
+}
+
+/* ── Light Theme ───────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface2: #f0f2f4;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --muted: #656d76;
+  --accent: #0969da;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --orange: #bf8700;
+  --purple: #8250df;
+  --tag-bg: #eaeef2;
+  --you-bubble: #dbeafe;
+  --shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Midnight Theme ────────────────────────────────────────── */
+[data-theme="midnight"] {
+  --bg: #060913;
+  --surface: #0d1226;
+  --surface2: #121a36;
+  --border: #1e2d5a;
+  --text: #c8d8ff;
+  --muted: #5a7aaa;
+  --accent: #7eb8ff;
+  --green: #4ade80;
+  --red: #f87171;
+  --orange: #fbbf24;
+  --purple: #c084fc;
+  --tag-bg: #111e40;
+  --you-bubble: #1a2d5a;
+  --shadow: 0 4px 32px rgba(0, 30, 100, 0.5);
+}
+
+/* ── Matrix Theme ──────────────────────────────────────────── */
+[data-theme="matrix"] {
+  --bg: #000000;
+  --surface: #001200;
+  --surface2: #001a00;
+  --border: #003300;
+  --text: #00ff41;
+  --muted: #006622;
+  --accent: #00ff41;
+  --green: #00ff41;
+  --red: #ff0000;
+  --orange: #ffcc00;
+  --purple: #00ffff;
+  --tag-bg: #001800;
+  --you-bubble: #001f00;
+  --shadow: 0 4px 24px rgba(0, 255, 65, 0.15);
+}
+
+/* CSS-002: Base Styles */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Consolas", "Courier New", monospace;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: none;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  cursor: none;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+/* ============================================================
+   LOGIN / AUTH SCREEN
+   ============================================================ */
+#login-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.login-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 36px 32px;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow);
+}
+.login-logo {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: var(--accent);
+  letter-spacing: 3px;
+  text-align: center;
+}
+.login-sub {
+  font-size: 0.68em;
+  color: var(--muted);
+  text-align: center;
+  margin-top: -8px;
+  letter-spacing: 2px;
+}
+.login-tabs {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.login-tab {
+  flex: 1;
+  padding: 7px;
+  text-align: center;
+  font-size: 0.75em;
+  color: var(--muted);
+  background: none;
+  border: none;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.login-tab.active {
+  background: var(--accent);
+  color: #0d1117;
+  font-weight: bold;
+}
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.login-field label {
+  font-size: 0.65em;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.login-field input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 0.83em;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.login-field input:focus {
+  border-color: var(--accent);
+}
+.login-btn {
+  background: var(--accent);
+  color: #0d1117;
+  border: none;
+  border-radius: 6px;
+  padding: 11px;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 0.85em;
+  transition: opacity 0.15s;
+}
+.login-btn:hover {
+  opacity: 0.85;
+}
+.login-btn:disabled {
+  opacity: 0.45;
+}
+.login-err {
+  font-size: 0.72em;
+  color: var(--red);
+  text-align: center;
+  min-height: 18px;
+}
+
+/*
+Class:
+.backend-status
+
+Purpose:
+Communicates whether the Flask API is reachable before authentication.
+
+Controlled by:
+Backend availability monitoring in aetheraeon.js.
+*/
+.backend-status {
+  display: none;
+  color: var(--red);
+  font-size: 0.72em;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.backend-status.visible {
+  display: block;
+}
+
+/* Initial authentication states previously declared inline in index.html. */
+#reg-fullname-field,
+#reg-username-field {
+  display: none;
+}
+.login-switch {
+  font-size: 0.68em;
+  color: var(--muted);
+  text-align: center;
+}
+.login-switch span {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* ── Password field with show/hide eye toggle ────────────── */
+.pw-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.pw-wrap input {
+  flex: 1;
+  padding-right: 40px !important;
+}
+.pw-eye {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 3px;
+  line-height: 0;
+  user-select: none;
+  transition: color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pw-eye:hover {
+  color: var(--accent);
+}
+.pw-eye svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+/* When password is visible the slash line shows, otherwise hidden */
+.pw-eye .eye-slash {
+  display: none;
+}
+.pw-eye.showing .eye-open {
+  display: none;
+}
+.pw-eye.showing .eye-slash {
+  display: block;
+}
+
+/* CSS-003: Layout */
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+#app {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* CSS-004: Navigation */
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+#sidebar {
+  width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition:
+    width 0.2s,
+    opacity 0.2s;
+  overflow: hidden;
+}
+#sidebar.collapsed {
+  width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Sidebar close button ───────────────────────────── */
+#sidebar-close-btn {
+  display: block !important;
+}
+
+.sidebar-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.sidebar-title {
+  font-size: 0.72em;
+  color: var(--muted);
+  font-weight: bold;
+  flex: 1;
+  letter-spacing: 1px;
+}
+.sb-icon-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.85em;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: all 0.12s;
+}
+.sb-icon-btn:hover {
+  color: var(--accent);
+  background: var(--tag-bg);
+}
+
+.conv-menu-btn {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.conv-menu-btn:hover {
+  color: white;
+}
+
+.conv-actions {
+  position: relative;
+  margin-left: auto;
+}
+
+.conv-dropdown-menu {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 140px;
+  z-index: 999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.conv-dropdown-item {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #ddd;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.conv-dropdown-item:hover {
+  background: #2d2d2d;
+}
+
+/* ── Search bar ──────────────────────────────────────────── */
+.sidebar-search {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sidebar-search input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.75em;
+  outline: none;
+}
+.sidebar-search input:focus {
+  border-color: var(--accent);
+}
+
+/* ── Sidebar sections ──────────────────────────────────────── */
+.sidebar-nav {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sidebar-nav-btn {
+  flex: 1;
+  padding: 7px 4px;
+  font-size: 0.65em;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.sidebar-nav-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.sidebar-nav-btn:hover {
+  color: var(--text);
+}
+
+#conv-list,
+#playbook-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+#playbook-list {
+  display: none;
+}
+#playbook-list.active {
+  display: block;
+}
+#conv-list.hidden {
+  display: none;
+}
+
+/* ── Conversation items ──────────────────────────────────── */
+.conv-group-label {
+  font-size: 0.6em;
+  color: var(--muted);
+  padding: 8px 12px 4px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.conv-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  margin: 1px 6px;
+  transition: background 0.12s;
+  position: relative;
+}
+.conv-item:hover {
+  background: var(--tag-bg);
+}
+.conv-item.active {
+  background: var(--you-bubble);
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+}
+.conv-pin-icon {
+  font-size: 0.7em;
+  color: var(--orange);
+  flex-shrink: 0;
+}
+.conv-name {
+  flex: 1;
+  font-size: 0.68em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conv-meta {
+  font-size: 0.6em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.conv-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.conv-item:hover .conv-actions,
+.conv-item.active .conv-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.conv-act-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.72em;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.conv-act-btn:hover {
+  color: var(--accent);
+}
+
+/* ── Playbook items ──────────────────────────────────────── */
+.pb-actions {
+  position: relative;
+}
+.pb-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  margin: 1px 6px;
+  transition: background 0.12s;
+}
+.pb-item:hover {
+  background: var(--tag-bg);
+}
+.pb-name {
+  flex: 1;
+  font-size: 0.78em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pb-act-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.72em;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.pb-act-btn:hover {
+  color: var(--accent);
+}
+.pb-new-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 12px;
+  padding: 7px;
+  border-radius: 6px;
+  background: var(--tag-bg);
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 0.75em;
+  transition: all 0.15s;
+}
+.pb-new-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Sidebar footer ──────────────────────────────────────── */
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  flex-shrink: 0;
+}
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+.user-badge:hover {
+  background: var(--tag-bg);
+}
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75em;
+  font-weight: bold;
+  color: #0d1117;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  transition: border-color 0.15s;
+}
+.user-avatar:hover {
+  border-color: var(--accent);
+}
+.user-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.user-name {
+  font-size: 0.73em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-email {
+  font-size: 0.6em;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── User context menu ───────────────────────────────────── */
+#user-menu {
+  display: none;
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  min-width: 180px;
+  z-index: 500;
+  box-shadow: var(--shadow);
+}
+#user-menu.open {
+  display: block;
+}
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 0.78em;
+  color: var(--text);
+  transition: background 0.12s;
+}
+.user-menu-item:hover {
+  background: var(--tag-bg);
+}
+.user-menu-item.danger {
+  color: var(--red);
+}
+.user-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ============================================================
+   MAIN AREA
+   ============================================================ */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Header ────────────────────────────────────────────────── */
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.toggle-sidebar {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1em;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+.toggle-sidebar:hover {
+  color: var(--accent);
+  background: var(--tag-bg);
+}
+.logo {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: var(--accent);
+  letter-spacing: 2px;
+}
+.conv-title-display {
+  font-size: 0.8em;
+  color: var(--muted);
+  border-bottom: 1px dashed transparent;
+  padding: 2px 4px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.conv-title-display:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+.conv-title-input {
+  font-size: 0.8em;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-family: inherit;
+  display: none;
+  width: 180px;
+  outline: none;
+}
+.header-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+/* ── Status dots ─────────────────────────────────────────── */
+.status-dots {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.status-dot-wrap {
+  text-align: center;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border);
+  margin: 0 auto 2px;
+}
+.dot.ok {
+  background: var(--green);
+}
+.dot.fail {
+  background: var(--red);
+  box-shadow: 0 0 5px var(--red);
+}
+.dot-label {
+  font-size: 0.58em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Header buttons ──────────────────────────────────────── */
+.h-btn {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 5px;
+  padding: 5px 11px;
+  font-size: 0.7em;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.h-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Search overlay ──────────────────────────────────────── */
+#search-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 800;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+}
+#search-overlay.open {
+  display: flex;
+}
+.search-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  width: 600px;
+  max-width: 95vw;
+  box-shadow: var(--shadow);
+}
+.search-box input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 0.9em;
+  outline: none;
+}
+.search-box input:focus {
+  border-color: var(--accent);
+}
+.search-results {
+  margin-top: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.search-result {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  transition: border-color 0.12s;
+}
+.search-result:hover {
+  border-color: var(--accent);
+}
+.search-result-conv {
+  font-size: 0.65em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.search-result-text {
+  font-size: 0.8em;
+  color: var(--text);
+}
+.search-result-role {
+  font-size: 0.65em;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.search-close {
+  float: right;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1em;
+}
+
+/* CSS-005: Chat */
+/* ============================================================
+   CHAT AREA
+   ============================================================ */
+#chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* CSS-006: Messages */
+.msg {
+  max-width: 100%;
+  animation: fadeUp 0.15s ease;
+}
+.msg-you {
+  align-self: flex-end;
+}
+.msg-ai {
+  align-self: flex-start;
+}
+/* CSS-008: Greeting Panel */
+/*
+Class:
+.temporary-greeting
+
+Purpose:
+Displays the temporary AI greeting inside the chat area.
+
+Controlled by:
+The greeting rendering and rotation functions in aetheraeon.js.
+*/
+.temporary-greeting {
+  align-self: center;
+  max-width: 720px;
+  margin: auto 0;
+  position: relative;
+  isolation: isolate;
+}
+.temporary-greeting .bubble {
+  font-size: 1em;
+  padding: 16px 20px;
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  transform-origin: center;
+}
+.greeting-countdown {
+  font-size: 0.63em;
+  color: var(--muted);
+  margin-bottom: 4px;
+  padding: 0 4px;
+  text-align: center;
+}
+/* Ready-state effects are CSS-only and loop until the greeting DOM is replaced. */
+.temporary-greeting.greeting-pulse-glow .bubble {
+  animation: greetingPulseGlow 2.4s ease-in-out infinite;
+}
+.temporary-greeting.greeting-breathe .bubble {
+  animation: greetingBreathe 3.2s ease-in-out infinite;
+}
+.temporary-greeting.greeting-border-flow .bubble {
+  border: 2px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    linear-gradient(90deg, transparent 5%, var(--accent) 45%, transparent 85%) border-box;
+  background-size:
+    100% 100%,
+    240% 100%;
+  animation: greetingBorderFlow 2.6s linear infinite;
+}
+.temporary-greeting.greeting-shimmer .bubble::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: -35%;
+  bottom: -35%;
+  left: -55%;
+  width: 34%;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 28%, transparent),
+    transparent
+  );
+  transform: skewX(-18deg);
+  animation: greetingShimmer 2.8s ease-in-out infinite;
+}
+.temporary-greeting.greeting-float .bubble {
+  animation: greetingFloat 2.8s ease-in-out infinite;
+}
+.temporary-greeting.greeting-cursor .bubble::after {
+  content: "\258D";
+  color: var(--accent);
+  margin-left: 5px;
+  text-shadow: 0 0 8px var(--accent);
+  animation: greetingCursorBlink 0.85s steps(1, end) infinite;
+}
+.temporary-greeting.greeting-cursor .bubble {
+  animation: greetingCursorAttention 2.4s ease-in-out infinite;
+}
+.temporary-greeting.greeting-energy-wave::before,
+.temporary-greeting.greeting-energy-wave::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: -2px;
+  border: 2px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  border-radius: 12px;
+  pointer-events: none;
+  animation: greetingEnergyWave 2.4s ease-out infinite;
+}
+.temporary-greeting.greeting-energy-wave::after {
+  animation-delay: 1.2s;
+}
+.temporary-greeting.greeting-focus-ring .bubble {
+  animation: greetingFocusRing 2.2s ease-in-out infinite;
+}
+.temporary-greeting.loading .bubble::before {
+  content: "";
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 9px;
+  border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: greetingSpinner 0.8s linear infinite;
+}
+.temporary-greeting.loading .bubble {
+  min-width: 260px;
+  min-height: 22px;
+  color: var(--text);
+  font-size: 0.92em;
+  font-style: normal;
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  opacity: 1;
+  animation: greetingLoadingThink 1.35s ease-in-out infinite;
+}
+
+/* CSS-009: Animations */
+@keyframes greetingPulseGlow {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  50% {
+    transform: scale(1.035);
+    box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 58%, transparent);
+  }
+}
+@keyframes greetingBreathe {
+  0%,
+  100% {
+    transform: scale(0.985);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.025);
+    opacity: 1;
+  }
+}
+@keyframes greetingBorderFlow {
+  0% {
+    background-position:
+      0 0,
+      120% 0;
+    box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 34%, transparent);
+  }
+  100% {
+    background-position:
+      0 0,
+      -120% 0;
+    box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+}
+@keyframes greetingShimmer {
+  0%,
+  18% {
+    left: -55%;
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  75%,
+  100% {
+    left: 125%;
+    opacity: 0;
+  }
+}
+@keyframes greetingFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+  }
+  50% {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 22px color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+}
+@keyframes greetingCursorBlink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes greetingCursorAttention {
+  0%,
+  100% {
+    border-color: var(--border);
+    box-shadow: 0 0 0 transparent;
+  }
+  50% {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 32%, transparent);
+  }
+}
+@keyframes greetingEnergyWave {
+  0% {
+    transform: scale(0.98);
+    opacity: 0.85;
+  }
+  70%,
+  100% {
+    transform: scale(1.09);
+    opacity: 0;
+  }
+}
+@keyframes greetingFocusRing {
+  0%,
+  100% {
+    border-color: var(--border);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+  50% {
+    border-color: var(--accent);
+    box-shadow:
+      0 0 0 5px color-mix(in srgb, var(--accent) 20%, transparent),
+      0 0 22px color-mix(in srgb, var(--accent) 42%, transparent);
+  }
+}
+@keyframes greetingLoadingThink {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 15%, transparent);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 48%, transparent);
+  }
+}
+@keyframes greetingSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bubble {
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 0.85em;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg-you .bubble {
+  background: var(--you-bubble);
+  color: var(--text);
+  border-bottom-right-radius: 2px;
+}
+.msg-ai .bubble {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 2px;
+}
+
+/* ── Code blocks in chat ─────────────────────────────────── */
+.bubble code {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 0.92em;
+  font-family: "Consolas", monospace;
+}
+.bubble pre {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 6px 0;
+  overflow-x: auto;
+  position: relative;
+}
+.bubble pre code {
+  background: none;
+  border: none;
+  padding: 0;
+}
+.code-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.65em;
+  font-family: inherit;
+}
+.code-copy-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── Message actions ─────────────────────────────────────── */
+.msg-actions {
+  display: none;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+.msg:hover .msg-actions {
+  display: flex;
+}
+.msg-act {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.65em;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.msg-act:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Timestamp & tool badge ─────────────────────────────── */
+.msg-meta {
+  font-size: 0.63em;
+  color: var(--muted);
+  margin-top: 3px;
+  padding: 0 4px;
+}
+.msg-you .msg-meta {
+  text-align: right;
+}
+.tool-badge {
+  display: inline-block;
+  font-size: 0.6em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  background: var(--tag-bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.tool-shell {
+  color: var(--green);
+  border-color: var(--green);
+}
+.tool-aider {
+  color: var(--purple);
+  border-color: var(--purple);
+}
+.tool-memory,
+.tool-chromadb_store,
+.tool-chromadb_recall,
+.tool-memory_recall {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+.tool-system {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── Process/debug details block ─────────────────────────── */
+details.proc {
+  margin-top: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+details.proc > summary {
+  color: var(--muted);
+  font-size: 0.72em;
+  user-select: none;
+}
+details.proc pre {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.75em;
+}
+
+/* ── Typing indicator ────────────────────────────────────── */
+.typing {
+  color: var(--muted);
+  font-size: 0.82em;
+  font-style: italic;
+}
+.typing span {
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ============================================================
+   QUICK BAR
+   ============================================================ */
+#quick-bar {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 6px 12px;
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.qbtn {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 0.7em;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.qbtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface2);
+}
+
+/* CSS-007: Input Area */
+/* ============================================================
+   INPUT ROW
+   ============================================================ */
+#input-row {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+#msg-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 9px 13px;
+  font-family: inherit;
+  font-size: 0.85em;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s;
+}
+#msg-input:focus {
+  border-color: var(--accent);
+}
+#send-btn {
+  background: var(--accent);
+  color: #0d1117;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 18px;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 0.85em;
+  transition: opacity 0.15s;
+}
+#send-btn:hover {
+  opacity: 0.85;
+}
+#send-btn:disabled {
+  opacity: 0.4;
+}
+#voice-btn {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-size: 1em;
+  transition: all 0.15s;
+}
+#voice-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#voice-btn.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* CSS-010: Settings */
+/* ============================================================
+   MODALS (shared base)
+   ============================================================ */
+
+/*
+HTML presentation declarations
+
+Purpose:
+Keeps index.html structural by assigning former inline declarations
+to existing stable IDs and structural selectors.
+*/
+#mem-import-file,
+#mem-del-sel-btn,
+#mem-sel-count,
+#mem-edit-id-disp {
+  display: none;
+}
+
+#mem-statusbar > span:nth-of-type(5) {
+  flex: 1;
+}
+
+#mem-statusbar > span:last-child {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+#mem-edit-box > div:nth-child(3) > label,
+.mem-edit-row label {
+  color: var(--muted);
+  font-size: 0.65em;
+  letter-spacing: 1px;
+}
+
+.mem-edit-row > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#panel-themes > div:last-child,
+#panel-profile > div:last-child,
+#panel-models > .modal-actions + div {
+  color: var(--muted);
+  font-size: 0.7em;
+}
+
+#panel-account > .modal-actions + div,
+#panel-models > .modal-actions + div + div {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--border);
+}
+
+#panel-account > .modal-actions + div + .modal-sub {
+  color: var(--red);
+}
+
+#panel-account > .modal-actions + div + .modal-sub + div {
+  color: var(--muted);
+  font-size: 0.73em;
+}
+
+#panel-models > .modal-actions + div + div + .modal-sub + div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8em;
+}
+
+#panel-models > .modal-actions + div + div + .modal-sub + div label {
+  color: var(--muted);
+  font-size: 0.75em;
+  letter-spacing: 1px;
+}
+
+#web-search-toggle {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+#panel-models > .modal-actions + div + div + .modal-sub + div + div {
+  color: var(--muted);
+  font-size: 0.68em;
+}
+
+#personality-traits-preview {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.75em;
+}
+
+#settings-modal > .modal-box > .modal-actions {
+  margin-top: 4px;
+}
+
+#personality-traits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+#playbook-modal .modal-field + .modal-field + div {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.7em;
+}
+
+#app {
+  display: none;
+}
+
+#main > header > .logo + div {
+  color: var(--muted);
+  font-size: 0.68em;
+}
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open {
+  display: flex;
+}
+.modal-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 26px 28px;
+  width: 420px;
+  max-width: 95vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal-title {
+  font-size: 0.95em;
+  font-weight: bold;
+  color: var(--text);
+}
+.modal-sub {
+  font-size: 0.72em;
+  color: var(--muted);
+}
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.modal-field label {
+  font-size: 0.65em;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.modal-field input,
+.modal-field textarea,
+.modal-field select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 11px;
+  font-family: inherit;
+  font-size: 0.82em;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.modal-field input:focus,
+.modal-field textarea:focus,
+.modal-field select:focus {
+  border-color: var(--accent);
+}
+.modal-field textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.modal-btn {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 0.8em;
+  transition: all 0.12s;
+}
+.modal-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.modal-btn.primary {
+  background: var(--accent);
+  color: #0d1117;
+  border-color: var(--accent);
+}
+.modal-btn.primary:hover {
+  opacity: 0.85;
+}
+.modal-btn.danger {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+.modal-btn.danger:hover {
+  opacity: 0.85;
+}
+
+/* Preserve the original per-dialog widths and playbook control sizing. */
+#settings-modal > .modal-box {
+  width: 500px;
+}
+
+#personality-manager-modal > .modal-box {
+  width: 480px;
+}
+
+#playbook-modal > .modal-box {
+  width: 520px;
+}
+
+#pb-step-list + .modal-btn {
+  font-size: 0.75em;
+}
+.modal-err {
+  font-size: 0.72em;
+  color: var(--red);
+  min-height: 16px;
+}
+.modal-ok {
+  font-size: 0.72em;
+  color: var(--green);
+  min-height: 16px;
+}
+.modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1em;
+}
+
+/* ── Settings tabs ───────────────────────────────────────── */
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  gap: 0;
+}
+.settings-tab {
+  padding: 8px 14px;
+  font-size: 0.72em;
+  color: var(--muted);
+  border: none;
+  background: none;
+  font-family: inherit;
+  border-bottom: 2px solid transparent;
+  transition: all 0.12s;
+}
+.settings-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.settings-tab:hover {
+  color: var(--text);
+}
+.settings-panel {
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-panel.active {
+  display: flex;
+}
+.theme-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.theme-btn {
+  padding: 10px;
+  border-radius: 6px;
+  border: 2px solid var(--border);
+  background: var(--tag-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.78em;
+  text-align: center;
+  transition: all 0.12s;
+}
+.theme-btn:hover {
+  border-color: var(--accent);
+}
+.theme-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ── Share modal ─────────────────────────────────────────── */
+/* Note: .modal-overlay already handles display/flex via .open class */
+.share-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.share-opt {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8em;
+  color: var(--text);
+  transition: border-color 0.12s;
+}
+.share-opt:hover {
+  border-color: var(--accent);
+}
+.share-opt-icon {
+  font-size: 1.3em;
+}
+
+/* ── Playbook modal ──────────────────────────────────────── */
+.pb-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pb-step {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.pb-step input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-family: inherit;
+  font-size: 0.78em;
+  outline: none;
+}
+.pb-step input:focus {
+  border-color: var(--accent);
+}
+.pb-step-del {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.9em;
+}
+.pb-step-del:hover {
+  color: var(--red);
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+#toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--green);
+  color: #0d1117;
+  padding: 8px 22px;
+  border-radius: 20px;
+  font-size: 0.78em;
+  font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 2000;
+}
+#toast.show {
+  opacity: 1;
+}
+
+/* ============================================================
+   VOICE INDICATOR
+   ============================================================ */
+#voice-indicator {
+  display: none;
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  background: var(--red);
+  color: #fff;
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 0.78em;
+  font-weight: bold;
+  box-shadow: var(--shadow);
+  z-index: 300;
+}
+#voice-indicator.show {
+  display: block;
+  animation: pulse 1s infinite;
+}
+
+/* ============================================================
+   MOBILE RESPONSIVE  — phones (portrait + landscape)
+   Targets: iPhone 11 Pro Max, modern Android, any ≤768px screen
+   ============================================================ */
+/* CSS-011: Responsive Design */
+@media (max-width: 768px) {
+  /* ── Root adjustments ─────────────────────────────────── */
+  :root {
+    --sidebar-w: 85vw;
+  }
+
+  /* Disable custom cursor on touch devices — use native */
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Consolas", "Courier New", monospace;
+    /* ----------------------------------------------------------
+     height: 100dvh uses dynamic viewport height on mobile.
+     100vh on iOS Safari includes the browser chrome (address
+     bar) in the measurement, which causes the bottom of the
+     page to be hidden behind it.  dvh accounts for the actual
+     visible area.  Falls back to 100vh on browsers that do
+     not support dvh.
+     ---------------------------------------------------------- */
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: none;
+  }
+
+  /* ── Login screen ─────────────────────────────────────── */
+  .login-box {
+    width: 92vw;
+    padding: 28px 20px;
+    margin: 0 auto;
+  }
+
+  /* ── App layout — stack sidebar as drawer overlay ─────── */
+  #app {
+    display: flex;
+    flex: 1;
+    /* ----------------------------------------------------------
+     min-height: 0 is required here for the same reason as
+     on #chat -- flex children must be able to shrink below
+     their natural content height for inner scroll to work.
+     ---------------------------------------------------------- */
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  #sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 400;
+    transform: translateX(-100%);
+    transition:
+      transform 0.25s ease,
+      opacity 0.25s ease;
+    width: var(--sidebar-w) !important;
+    opacity: 1 !important;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+  }
+  #sidebar.open {
+    transform: translateX(0);
+  }
+  /* collapsed = default on mobile — closed drawer */
+  #sidebar.collapsed {
+    transform: translateX(-100%);
+    width: var(--sidebar-w) !important;
+    opacity: 1 !important;
+  }
+
+  /* Backdrop when sidebar drawer is open */
+  #sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 399;
+  }
+  #sidebar-backdrop.show {
+    display: block;
+  }
+
+  /* Main takes full width on mobile */
+  #main {
+    /* ----------------------------------------------------------
+     overflow: hidden on #main clips the chat scroll area on
+     some iOS versions.  Switch to clip which has the same
+     effect of preventing the sidebar from bleeding through
+     but does not create a new stacking scroll context that
+     interferes with the child #chat scrolling.
+     height: 100% ensures the flex column fills the full
+     viewport height so #chat gets the correct available space.
+     ---------------------------------------------------------- */
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: clip;
+    min-width: 0;
+    height: 100%;
+  }
+
+  /* ── Header ───────────────────────────────────────────── */
+  header {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .logo {
+    font-size: 0.95em;
+  }
+
+  /* Hide non-essential header buttons on small screens */
+  .h-btn.hide-mobile {
+    display: none;
+  }
+
+  /* Stack status dots more compactly */
+  .status-dots {
+    gap: 6px;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+  }
+  .dot-label {
+    font-size: 0.52em;
+  }
+
+  /* Conv title: shorter max-width */
+  .conv-title-display {
+    max-width: 120px;
+    font-size: 0.72em;
+  }
+
+  /* ── Chat ─────────────────────────────────────────────── */
+  /* Chat scroll container */
+  #chat {
+    /* ----------------------------------------------------------
+     flex: 1 makes chat fill all remaining vertical space between
+     header and input-row.  min-height: 0 is critical -- without
+     it, flex children do not shrink below their content size on
+     some browsers, which prevents overflow-y from activating.
+     -webkit-overflow-scrolling enables momentum scrolling on iOS.
+     ---------------------------------------------------------- */
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .bubble {
+    font-size: 0.88em;
+    padding: 8px 11px;
+  }
+
+  /* ── Quick bar — horizontal scroll on mobile ──────────── */
+  #quick-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 8px;
+    gap: 6px;
+    height: 38px;
+    align-items: center;
+    -webkit-overflow-scrolling: touch;
+  }
+  #quick-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .qbtn {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    font-size: 0.72em;
+    min-height: 30px;
+    /* ----------------------------------------------------------
+       Override the 44px min-height set in the touch targets
+       rule below.  qbtn is small intentionally -- the bar must
+       stay one fixed height row.
+       ---------------------------------------------------------- */
+    height: 30px;
+  }
+
+  /* ── Input row ────────────────────────────────────────── */
+  #input-row {
+    padding: 8px 8px;
+    gap: 6px;
+    flex-shrink: 0;
+    display: flex;
+  }
+  #msg-input {
+    font-size: 0.9em;
+    padding: 10px 11px;
+  }
+  #send-btn {
+    padding: 10px 14px;
+    font-size: 0.85em;
+    min-width: 60px;
+  }
+  #voice-btn {
+    padding: 10px 11px;
+  }
+
+  /* ── Modals — full width on mobile ───────────────────── */
+  .modal-box {
+    width: 95vw !important;
+    max-height: 88vh;
+    padding: 20px 16px;
+    border-radius: 10px;
+  }
+  .settings-tab {
+    font-size: 0.65em;
+    padding: 7px 8px;
+  }
+  .theme-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .theme-btn {
+    font-size: 0.72em;
+    padding: 8px 6px;
+  }
+
+  /* ── Search overlay ───────────────────────────────────── */
+  #search-overlay {
+    padding-top: 40px;
+    align-items: flex-start;
+  }
+  .search-box {
+    width: 96vw;
+    padding: 14px;
+  }
+
+  /* ── Voice indicator — above input row ───────────────── */
+  #voice-indicator {
+    bottom: 70px;
+    right: 12px;
+    font-size: 0.72em;
+    padding: 6px 14px;
+  }
+
+  /* ── Sidebar footer user badge ────────────────────────── */
+  .user-name {
+    font-size: 0.68em;
+  }
+  .user-email {
+    font-size: 0.56em;
+  }
+
+  /* ── Touch targets — minimum 44px for accessibility ───── */
+  /* ----------------------------------------------------------
+     Touch targets - 44px minimum for all tappable elements
+     except qbtn which has its own fixed height above to keep
+     the quick-bar row compact.
+     ---------------------------------------------------------- */
+  .conv-act-btn,
+  .pb-act-btn,
+  .sb-icon-btn,
+  .pw-eye,
+  .conv-item,
+  .pb-item,
+  #send-btn,
+  #voice-btn {
+    min-height: 44px;
+  }
+  .conv-item,
+  .pb-item {
+    padding: 10px 10px;
+  }
+
+  /* ── Conv action buttons — always visible on mobile ────── */
+  /* On mobile there's no hover, so show actions all the time */
+  .conv-actions {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Main memory window */
+  #mem-panel {
+    width: 98vw;
+    max-width: 98vw;
+    max-height: 92vh;
+    border-radius: 8px;
+  }
+
+  /* Header / toolbar tighter */
+  #mem-toolbar {
+    padding: 8px 10px;
+  }
+  #mem-header {
+    padding: 10px 12px;
+  }
+
+  /* ----------------------------------------------------------
+     IMPORTANT:
+     Allow horizontal scrolling instead of compressing columns.
+     min-width forces the table wider than the phone screen.
+     ---------------------------------------------------------- */
+  #mem-table-wrap {
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #mem-table {
+    min-width: 900px;
+    font-size: 0.72em;
+  }
+
+  #mem-table th,
+  #mem-table td {
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+
+  /* ----------------------------------------------------------
+     Content column:
+     Allow readable width instead of collapsing to zero.
+     ---------------------------------------------------------- */
+  .mem-content-cell {
+    min-width: 240px;
+    max-width: 240px;
+  }
+
+  /* Smaller action buttons */
+  .mem-row-btn {
+    padding: 4px 6px;
+    font-size: 0.65em;
+  }
+
+  /* Smaller toolbar buttons */
+  .mem-tool-btn {
+    padding: 6px 10px;
+    font-size: 0.72em;
+  }
+}
+
+/* Landscape phone — tighter vertical space */
+@media (max-width: 768px) and (orientation: landscape) {
+  /* =========================================================
+     LANDSCAPE MOBILE FIX (stable viewport layout)
+     Fixes browser address bar / toolbar resizing issues
+     Ensures consistent height regardless of UI chrome state
+     ========================================================= */
+
+  html,
+  body {
+    height: 100dvh;
+    height: 100vh; /* fallback */
+    overflow: hidden;
+  }
+
+  /* Root app must fully occupy viewport */
+  #app {
+    height: 100dvh;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* Main layout container */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* =========================================================
+     CHAT AREA (this is what was breaking layout before)
+     ========================================================= */
+  #chat {
+    flex: 1;
+    min-height: 0;
+
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  /* =========================================================
+     HEADER (reduce vertical pressure)
+     ========================================================= */
+  header {
+    padding: 4px 8px;
+    min-height: 0;
+  }
+
+  .logo {
+    display: none;
+  }
+
+  /* =========================================================
+     QUICK BAR (hidden in landscape to reduce height)
+     ========================================================= */
+  #quick-bar {
+    display: none;
+  }
+
+  /* =========================================================
+     INPUT ROW (compact)
+     ========================================================= */
+  #input-row {
+    padding: 4px 8px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  #msg-input {
+    font-size: 0.82em;
+    padding: 6px 8px;
+  }
+
+  #send-btn,
+  #voice-btn {
+    padding: 6px 8px;
+  }
+
+  /* =========================================================
+     BUBBLES (slightly smaller for landscape density)
+     ========================================================= */
+  .bubble {
+    font-size: 0.8em;
+    padding: 6px 10px;
+  }
+
+  /* =========================================================
+     MEMORY PANEL (force proper fit)
+     ========================================================= */
+  #mem-panel {
+    width: 100vw;
+    height: 100dvh;
+    height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+
+    overflow: hidden;
+  }
+
+  #mem-table-wrap {
+    flex: 1;
+    min-height: 0;
+
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+
+  /* shrink table density */
+  #mem-table {
+    font-size: 0.65em;
+    min-width: 700px;
+  }
+
+  #mem-table th,
+  #mem-table td {
+    padding: 4px 6px;
+  }
+
+  /* tighter columns */
+  #mem-table th:nth-child(2) {
+    width: 70px;
+  }
+  #mem-table th:nth-child(4) {
+    width: 100px;
+  }
+  #mem-table th:nth-child(5) {
+    width: 60px;
+  }
+  #mem-table th:nth-child(6) {
+    width: 60px;
+  }
+
+  .mem-content-cell {
+    min-width: 160px;
+    max-width: 160px;
+  }
+
+  /* buttons smaller */
+  .mem-row-btn,
+  .mem-tool-btn {
+    font-size: 0.6em;
+    padding: 3px 5px;
+  }
+
+  /* status bar */
+  #mem-statusbar {
+    padding: 4px 8px;
+    font-size: 0.6em;
+  }
+
+  /* modal tighter */
+  #mem-edit-box {
+    width: 92vw;
+    padding: 14px 16px;
+  }
+
+  #mem-edit-content {
+    min-height: 70px;
+  }
+}
+
+/* Tablet (769–1024px) — sidebar stays visible but narrower */
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --sidebar-w: 220px;
+  }
+  .h-btn {
+    padding: 4px 8px;
+    font-size: 0.65em;
+  }
+}
+
+.process-box {
+  background: #111;
+  color: #aaa;
+  font-size: 12px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.process-box summary {
+  cursor: pointer;
+  font-weight: bold;
+  color: #888;
+}
+
+/* ============================================================
+   CUSTOM CURSOR SYSTEM
+   
+   Any element that should trigger hover effect must have:
+   class="clickable"
+   ============================================================ */
+
+.cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+
+  width: 18px;
+  height: 18px;
+
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+
+  transform: translate(-50%, -50%);
+
+  mix-blend-mode: difference;
+
+  background: white;
+  border: 3px solid #3a3a3a;
+
+  transition:
+    width 0.15s ease,
+    height 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* =======================================================
+   CENTER CORE
+======================================================= */
+
+.cursor::after {
+  content: "";
+  position: absolute;
+
+  inset: 0;
+  border-radius: 50%;
+
+  background: white;
+
+  animation: idlePulse 6s infinite ease-in-out;
+}
+
+/* VERY subtle idle breathing */
+@keyframes idlePulse {
+  0% {
+    background: white;
+    opacity: 0.92;
+  }
+
+  50% {
+    background: #777;
+    opacity: 0.78;
+  }
+
+  100% {
+    background: white;
+    opacity: 0.92;
+  }
+}
+
+/* =======================================================
+   HOVER EFFECT
+======================================================= */
+
+.cursor.hover {
+  animation: hoverGrow 1.2s infinite ease-in-out;
+  border-width: 4px;
+}
+
+/* smoother breathing size */
+@keyframes hoverGrow {
+  0% {
+    width: 18px;
+    height: 18px;
+  }
+  20% {
+    width: 22px;
+    height: 22px;
+  }
+  40% {
+    width: 27px;
+    height: 27px;
+  }
+  60% {
+    width: 32px;
+    height: 32px;
+  }
+  80% {
+    width: 27px;
+    height: 27px;
+  }
+  100% {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* Faster color breathing on buttons */
+.cursor.hover::after {
+  animation: hoverColor 1.5s infinite ease-in-out;
+}
+
+@keyframes hoverColor {
+  0% {
+    background: white;
+    opacity: 1;
+  }
+
+  50% {
+    background: #1f1f1f;
+    opacity: 0.75;
+  }
+
+  100% {
+    background: white;
+    opacity: 1;
+  }
+}
+
+/* =======================================================
+   SINGLE CLICK
+======================================================= */
+
+.cursor.clicking {
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.95),
+    0 0 14px rgba(255, 255, 255, 0.95),
+    0 0 28px rgba(255, 255, 255, 0.8),
+    0 0 42px rgba(0, 0, 0, 0.7);
+
+  animation: clickImpact 0.22s ease-out;
+}
+
+@keyframes clickImpact {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* =======================================================
+   HOLD CLICK
+======================================================= */
+
+.cursor.holding {
+  box-shadow:
+    0 0 0 5px rgba(255, 255, 255, 1),
+    0 0 18px rgba(255, 255, 255, 0.95),
+    0 0 38px rgba(255, 255, 255, 0.8),
+    0 0 60px rgba(0, 0, 0, 0.75);
+
+  animation: holdBreath 1s infinite ease-in-out;
+}
+
+@keyframes holdBreath {
+  0% {
+    filter: brightness(1);
+  }
+
+  50% {
+    filter: brightness(1.45);
+  }
+
+  100% {
+    filter: brightness(1);
+  }
+}
+
+/* =======================================================
+   DOUBLE CLICK
+======================================================= */
+
+.cursor.double::after {
+  animation: doublePulse 0.35s ease-out 2;
+}
+
+@keyframes doublePulse {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.8);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.clickable {
+  transition: transform 0.15s ease;
+}
+
+.clickable:active {
+  transform: scale(0.98);
+}
+
+/* ============================================================
+   END OF CUSTOM CURSOR SYSTEM
+   ============================================================ */
+
+/* ── Memory Manager Modal overlay ─────────────────────────── */
+#mem-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1100;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#mem-modal.open {
+  display: flex;
+}
+
+/* ── Main panel ────────────────────────────────────────────── */
+#mem-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(1100px, 96vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* ── Panel header bar ──────────────────────────────────────── */
+#mem-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+#mem-title {
+  font-size: 0.95em;
+  font-weight: bold;
+  color: var(--text);
+  flex: 1;
+  white-space: nowrap;
+}
+#mem-count-badge {
+  font-size: 0.68em;
+  color: var(--muted);
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+/* ── Toolbar (search / filter / actions) ────────────────────── */
+#mem-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Search input */
+#mem-search-input {
+  flex: 1;
+  min-width: 160px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 0.8em;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#mem-search-input:focus {
+  border-color: var(--accent);
+}
+
+/* Type filter dropdown */
+#mem-type-filter {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 0.78em;
+  outline: none;
+  cursor: pointer;
+}
+#mem-type-filter:focus {
+  border-color: var(--accent);
+}
+
+/* Sort dropdown */
+#mem-sort-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-family: inherit;
+  font-size: 0.78em;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Toolbar action buttons */
+.mem-tool-btn {
+  background: var(--tag-bg);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 7px 13px;
+  font-size: 0.75em;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.mem-tool-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mem-tool-btn.danger:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+.mem-tool-btn.primary {
+  background: var(--accent);
+  color: #0d1117;
+  border-color: var(--accent);
+}
+.mem-tool-btn.primary:hover {
+  opacity: 0.85;
+}
+
+/* ── Table area ────────────────────────────────────────────── */
+#mem-table-wrap {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* Memory table — SQLyog-style grid */
+#mem-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78em;
+  table-layout: fixed;
+}
+#mem-table th {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.7em;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+#mem-table th:hover {
+  color: var(--accent);
+}
+#mem-table th .sort-arrow {
+  display: inline-block;
+  margin-left: 4px;
+  opacity: 0.4;
+  font-size: 0.85em;
+}
+#mem-table th.sorted-asc .sort-arrow {
+  opacity: 1;
+  content: "↑";
+}
+#mem-table th.sorted-desc .sort-arrow {
+  opacity: 1;
+}
+
+/* Column widths */
+#mem-table th:nth-child(1) {
+  width: 28px;
+} /* checkbox */
+#mem-table th:nth-child(2) {
+  width: 90px;
+} /* type */
+#mem-table th:nth-child(3) {
+  width: auto;
+} /* content  */
+#mem-table th:nth-child(4) {
+  width: 130px;
+} /* timestamp */
+#mem-table th:nth-child(5) {
+  width: 70px;
+} /* source */
+#mem-table th:nth-child(6) {
+  width: 80px;
+} /* actions */
+
+#mem-table td {
+  border: 1px solid var(--border);
+  padding: 7px 12px;
+  vertical-align: top;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+/* Row hover & selected states */
+#mem-table tr:hover td {
+  background: var(--tag-bg);
+}
+#mem-table tr.selected td {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+#mem-table tr.selected:hover td {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Content cell — truncate but expandable */
+.mem-content-cell {
+  max-width: 0; /* forces text-overflow to work in table */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mem-content-cell:hover {
+  color: var(--accent);
+}
+.mem-content-cell.expanded {
+  white-space: normal;
+  overflow: visible;
+  max-width: none;
+}
+
+/* Type badge pill */
+.mem-type-badge {
+  display: inline-block;
+  font-size: 0.7em;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+/* Type colour mapping — mirrors your existing tool-badge colours */
+.mem-type-user_fact {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.mem-type-navigation {
+  color: var(--green);
+  border-color: var(--green);
+}
+.mem-type-code_edit {
+  color: var(--purple);
+  border-color: var(--purple);
+}
+.mem-type-playbook {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+.mem-type-shortcut {
+  color: var(--orange);
+  border-color: var(--orange);
+}
+.mem-type-config {
+  color: var(--muted);
+  border-color: var(--muted);
+}
+.mem-type-conversation {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.mem-type-n8n {
+  color: var(--purple);
+  border-color: var(--purple);
+}
+.mem-type-system_event {
+  color: var(--red);
+  border-color: var(--red);
+}
+.mem-type-preference {
+  color: var(--green);
+  border-color: var(--green);
+}
+.mem-type-general {
+  color: var(--muted);
+  border-color: var(--muted);
+}
+
+/* ID cell — mono, muted, small */
+.mem-id-cell {
+  font-size: 0.68em;
+  color: var(--muted);
+  font-family: "Consolas", monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Inline row action buttons */
+.mem-row-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 0.68em;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+  margin-right: 3px;
+}
+.mem-row-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mem-row-btn.del:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Checkbox */
+.mem-checkbox {
+  cursor: pointer;
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+}
+
+/* ── Status bar ─────────────────────────────────────────────── */
+#mem-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 18px;
+  border-top: 1px solid var(--border);
+  font-size: 0.7em;
+  color: var(--muted);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+#mem-statusbar span {
+  white-space: nowrap;
+}
+#mem-sel-count {
+  color: var(--accent);
+}
+#mem-load-msg {
+  color: var(--orange);
+}
+
+/* ── Empty / loading / error states ─────────────────────────── */
+.mem-state-row td {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── Edit / Create Memory Modal ─────────────────────────────── */
+#mem-edit-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 1200;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#mem-edit-modal.open {
+  display: flex;
+}
+
+#mem-edit-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 26px 28px;
+  width: min(560px, 95vw);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: var(--shadow);
+}
+#mem-edit-title {
+  font-size: 0.9em;
+  font-weight: bold;
+  color: var(--text);
+}
+#mem-edit-id-disp {
+  font-size: 0.65em;
+  color: var(--muted);
+  font-family: "Consolas", monospace;
+  word-break: break-all;
+}
+
+/* Reuse .modal-field styles already in your index.html */
+/* textarea for content */
+#mem-edit-content {
+  width: 100%;
+  min-height: 120px;
+  resize: vertical;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-size: 0.82em;
+  outline: none;
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+#mem-edit-content:focus {
+  border-color: var(--accent);
+}
+
+/* Type + source inline row */
+.mem-edit-row {
+  display: flex;
+  gap: 10px;
+}
+.mem-edit-row select,
+.mem-edit-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: inherit;
+  font-size: 0.8em;
+  outline: none;
+}
+.mem-edit-row select:focus,
+.mem-edit-row input:focus {
+  border-color: var(--accent);
+}
+
+/* Edit modal actions */
+.mem-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.mem-edit-err {
+  font-size: 0.72em;
+  color: var(--red);
+  min-height: 16px;
+}
+
+/* ── Mobile adjustments ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  #mem-panel {
+    width: 99vw;
+    max-height: 95vh;
+    border-radius: 8px;
+  }
+  #mem-toolbar {
+    padding: 8px 10px;
+  }
+  #mem-header {
+    padding: 10px 12px;
+  }
+  #mem-table {
+    font-size: 0.72em;
+  }
+  #mem-table th,
+  #mem-table td {
+    padding: 6px 8px;
+  }
+  .mem-tool-btn {
+    padding: 6px 10px;
+    font-size: 0.72em;
+  }
+}

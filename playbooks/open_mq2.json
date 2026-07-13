@@ -1,0 +1,26 @@
+{
+  "name": "open_mq2",
+  "description": "Opens the MQ2 project folder and lists its contents",
+  "steps": [
+    {
+      "action": "chat",
+      "message": "Opening MQ2 project..."
+    },
+    {
+      "action": "open",
+      "target": "H:\\MQ2_Project"
+    },
+    {
+      "action": "wait",
+      "target": "1"
+    },
+    {
+      "action": "list",
+      "target": "H:\\MQ2_Project"
+    },
+    {
+      "action": "chat",
+      "message": "MQ2 project is open and ready."
+    }
+  ]
+}
