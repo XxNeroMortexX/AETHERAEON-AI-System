@@ -26,8 +26,7 @@ ENV/
 # DATABASES (LOCAL / PRIVATE DATA)
 # =========================
 *.db
-*.sqlite
-*.sqlite3
+*.sqlite*
 
 # MariaDB dumps (NEVER commit real data)
 *.sql
