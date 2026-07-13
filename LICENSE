@@ -1,58 +1,169 @@
-# License
+Aetheraeon AI Custom Source-Available Non-Commercial License
 
-Copyright (c) 2026 James Meis
+Copyright (c) 2025-2026 James Meis
 
----
+All Rights Reserved.
 
-## Purpose
+==================================================
+1. LICENSE GRANT
+==================================================
 
-This project is shared for personal, educational, and research purposes only. It is not intended for commercial use without explicit permission from the author.
+This software, including but not limited to source code, documentation,
+configuration files, user interface designs, project structure, and
+associated materials ("Software"), is the original intellectual property
+of James Meis ("Copyright Holder").
 
----
+Permission is granted to individuals to access, view, download, install,
+execute, study, and modify this Software solely for personal,
+educational, research, and non-commercial purposes.
 
-## Permissions
+This license grants limited permission to use the Software only under the
+terms and conditions contained within this agreement.
 
-You are allowed to:
-- View and study this code
-- Use this project for personal learning and experimentation
-- Modify the code for personal, non-commercial use
-- Reference ideas or architecture for educational purposes
+==================================================
+2. PERMITTED USE
+==================================================
 
----
+You may:
 
-## Restrictions
+- View and study the source code.
+- Run the Software for personal use.
+- Modify the Software for personal, non-commercial purposes.
+- Use the Software for learning, experimentation, and research.
+- Create private modifications that are not distributed or commercially
+  exploited.
 
-You are NOT allowed to:
-- Use this project or any part of it for commercial purposes
-- Sell, license, or monetize this software
-- Include this code in any paid product, service, or business application
-- Deploy this system in any environment that generates revenue (directly or indirectly)
-- Remove or alter this license notice
+==================================================
+3. PROHIBITED USE
+==================================================
 
----
+Without prior written permission from the Copyright Holder, you may NOT:
 
-## Commercial Use
+- Use the Software for commercial purposes.
+- Sell, lease, rent, sublicense, or redistribute the Software.
+- Offer the Software as a paid product or service.
+- Host the Software as a commercial SaaS, subscription, or managed service.
+- Include the Software or substantial portions of the Software inside a
+  commercial product.
+- Use the Software to create a competing commercial AI assistant,
+  platform, service, or product.
+- Remove, modify, or hide copyright notices or license information.
+- Represent the Software, modified versions, or derivative works as your
+  own original project.
+- Use the Aetheraeon AI name, branding, logos, identity, or official
+  project materials without permission.
 
-Commercial use of this project is strictly prohibited without written permission from the copyright holder.
+==================================================
+4. COMMERCIAL LICENSING
+==================================================
 
-If you wish to use this project in a commercial product, service, or business environment, you must obtain a separate paid license agreement.
+Commercial use is not granted under this license.
 
----
+Organizations, businesses, companies, developers, or individuals wishing
+to use this Software commercially must obtain a separate written
+commercial license agreement from the Copyright Holder.
 
-## Contributions
+Commercial use includes, but is not limited to:
 
-By contributing to this project, you agree that your contributions will be subject to the same license terms unless otherwise agreed in writing.
+- Selling access to the Software.
+- Using the Software to provide paid services.
+- Incorporating the Software into a commercial application.
+- Deploying the Software inside a revenue-generating environment.
+- Offering hosted access to the Software or modified versions.
 
----
+==================================================
+5. DERIVATIVE WORKS
+==================================================
 
-## Disclaimer
+Modifications created under this license remain subject to these same
+license restrictions.
 
-This software is provided "as is", without warranty of any kind. The author is not responsible for any damages, losses, or outcomes resulting from its use.
+Creating modifications does not transfer ownership of the original
+Software, architecture, implementation, documentation, or project
+identity.
 
----
+Any public distribution of modified versions requires written permission
+from the Copyright Holder.
 
-## Summary
+==================================================
+6. OWNERSHIP
+==================================================
 
-- Personal use: Allowed  
-- Educational use: Allowed  
-- Commercial use: Not allowed without permission  
+The Software and all original components remain the exclusive intellectual
+property of James Meis.
+
+This license grants permission to use the Software. It does not transfer
+ownership, copyright, trademark rights, or intellectual property rights.
+
+The Aetheraeon AI name, branding, visual identity, and associated project
+materials remain protected property of the Copyright Holder.
+
+==================================================
+7. THIRD-PARTY COMPONENTS
+==================================================
+
+This Software may include third-party libraries, frameworks, models,
+tools, or dependencies that are licensed separately by their respective
+owners.
+
+Those components remain subject to their own individual licenses.
+
+This license applies only to original Aetheraeon AI materials created by
+James Meis.
+
+==================================================
+8. CONTRIBUTIONS
+==================================================
+
+Unless otherwise agreed in writing, contributions submitted to this
+project may be used, modified, and incorporated by the Copyright Holder
+as part of Aetheraeon AI.
+
+Contributors retain ownership of their original contributions while
+granting necessary rights for inclusion within the project.
+
+==================================================
+9. DISCLAIMER
+==================================================
+
+The Software is provided "AS IS", without warranty of any kind, express
+or implied.
+
+The Copyright Holder is not responsible for damages, data loss, security
+issues, system failures, or any consequences resulting from the use of
+this Software.
+
+==================================================
+10. TERMINATION
+==================================================
+
+This license automatically terminates if you violate any terms contained
+within this agreement.
+
+Upon termination, you must stop using the Software and remove copies in
+your possession.
+
+==================================================
+11. SUMMARY
+==================================================
+
+Allowed:
+✓ Personal use
+✓ Educational use
+✓ Research use
+✓ Private modification
+
+Not allowed without permission:
+✗ Commercial use
+✗ Selling the Software
+✗ SaaS/hosting service
+✗ Commercial products
+✗ Rebranding or claiming ownership
+
+Copyright Holder:
+
+James Meis
+
+Project:
+
+Aetheraeon AI

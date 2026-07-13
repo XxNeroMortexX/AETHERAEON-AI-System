@@ -144,4 +144,12 @@ Use [Docs/WEBUI_REVIEW_NOTES.md](Docs/WEBUI_REVIEW_NOTES.md) for known frontend 
 
 ## License
 
-No license file is currently present. Before public distribution, the repository owner should choose and add a license that reflects the intended permissions for use, modification, and redistribution. Until then, normal copyright restrictions apply.
+Aetheraeon AI is released under a custom **Source-Available Non-Commercial License**.
+
+You are welcome to view, study, and use the project for personal, educational, and research purposes. Commercial use, redistribution, resale, hosting as a paid service, or inclusion in commercial products requires written permission from the copyright holder.
+
+See the full license terms here:
+
+[LICENSE](LICENSE)
+
+Copyright © 2025-2026 James Meis
