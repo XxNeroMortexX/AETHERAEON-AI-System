@@ -1,58 +1,54 @@
 <h2 align="center">Preview</h2>
 
 <table align="center">
-
   <tr>
-  
     <td align="center">
       <b>Main Chat Interface</b><br>
-      <img src="images/Conversation.png" width="400">
+      <img src="images/Conversation.png" width="400" alt="Aetheraeon AI conversation interface">
     </td>
+
     <td align="center">
-      <b>ChromaDB Memory System</b><br>
-      <img src="images/Chromadb_Manager.png" width="400">
+      <b>Memory Manager</b><br>
+      <img src="images/Chromadb_Manager.png" width="400" alt="Aetheraeon AI memory manager using ChromaDB">
     </td>
-	
   </tr>
-  
+
   <tr>
-  
     <td align="center">
       <b>Search</b><br>
-      <img src="images/Search.png" width="400">
+      <img src="images/Search.png" width="400" alt="Aetheraeon AI conversation search">
     </td>
+
     <td align="center">
       <b>Share</b><br>
-      <img src="images/Share.png" width="400">
+      <img src="images/Share.png" width="400" alt="Aetheraeon AI conversation sharing">
     </td>
-	<td align="center">
-      <b>User Menu</b><br>
-      <img src="images/User_Menu.png" width="400">
-    </td>
-	
   </tr>
-  
+
   <tr>
-  
+    <td align="center">
+      <b>User Menu</b><br>
+      <img src="images/User_Menu.png" width="400" alt="Aetheraeon AI user menu">
+    </td>
+
     <td align="center">
       <b>Settings</b><br>
-      <img src="images/Settings.png" width="400">
+      <img src="images/Settings.png" width="400" alt="Aetheraeon AI settings panel">
     </td>
-    <td align="center">
-      <b>Login/Register Screen</b><br>
-      <img src="images/Login.png" width="400">
-	  <img src="images/Register.png" width="400">
-    </td>
-	
   </tr>
-  
+
+  <tr>
+    <td align="center">
+      <b>Login / Register</b><br>
+      <img src="images/Login_Register.png" width="400" alt="Aetheraeon AI login and registration screen">
+    </td>
+  </tr>
 </table>
 
 <p align="center">
   <b>Welcome Dashboard</b><br>
-  <img src="images/Welcome_Dashboard.png" width="550">
+  <img src="images/Welcome_Dashboard.png" width="550" alt="Aetheraeon AI welcome dashboard">
 </p>
-
 
 # Aetheraeon AI
 
