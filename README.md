@@ -1,3 +1,59 @@
+<h2 align="center">Preview</h2>
+
+<table align="center">
+
+  <tr>
+  
+    <td align="center">
+      <b>Main Chat Interface</b><br>
+      <img src="images/Conversation.png" width="400">
+    </td>
+    <td align="center">
+      <b>ChromaDB Memory System</b><br>
+      <img src="images/Chromadb_Manager.png" width="400">
+    </td>
+	
+  </tr>
+  
+  <tr>
+  
+    <td align="center">
+      <b>Search</b><br>
+      <img src="images/Search.png" width="400">
+    </td>
+    <td align="center">
+      <b>Share</b><br>
+      <img src="images/Share.png" width="400">
+    </td>
+	<td align="center">
+      <b>User Menu</b><br>
+      <img src="images/User_Menu.png" width="400">
+    </td>
+	
+  </tr>
+  
+  <tr>
+  
+    <td align="center">
+      <b>Settings</b><br>
+      <img src="images/Settings.png" width="400">
+    </td>
+    <td align="center">
+      <b>Login/Register Screen</b><br>
+      <img src="images/Login.png" width="400">
+	  <img src="images/Register.png" width="400">
+    </td>
+	
+  </tr>
+  
+</table>
+
+<p align="center">
+  <b>Welcome Dashboard</b><br>
+  <img src="images/Welcome_Dashboard.png" width="550">
+</p>
+
+
 # Aetheraeon AI
 
 Aetheraeon AI is a self-hosted personal AI assistant for Windows. It combines local Ollama models, persistent conversations, MariaDB-backed application data, ChromaDB long-term memory, configurable personality, playbooks, and optional automation tools behind a Flask web interface.
