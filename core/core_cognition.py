@@ -1,128 +1,21 @@
 """
-========================================================
-AETHERAEON — Cognitive Processing Layer
-========================================================
+Aetheraeon AI - Core Cognition
 
-FILE PURPOSE:
-This file is the foundational cognition engine of the AI.
+Purpose:
+Provides current analytical and contextual reasoning support used by higher-level coordination components.
 
-It handles low-level reasoning primitives, decision logic,
-and cognitive processing utilities used across the system.
+Architecture Layer:
+Core Intelligence Layer - cognitive processing support.
 
-It is NOT the full orchestrator.
-It is the internal "thinking machinery" used by higher layers
-such as ai_orchestrator.py and request_router.py.
+Responsibilities:
+- Produce structured analytical and contextual signals from supplied inputs.
+- Combine applicable cognitive signals into a normalized result.
+- Support current orchestration without performing external actions.
 
-========================================================
-SYSTEM ROLE:
-"Brain Core Layer" of the architecture.
-
-It provides raw cognitive functions that higher systems
-use to build intelligence workflows.
-
-It does NOT directly respond to users.
-
-========================================================
-RESPONSIBILITIES:
-(core_cognition.py)
-
-- Low-level reasoning functions
-- Cognitive pattern evaluation
-- Decision scoring and weighting logic
-- Thought structuring utilities
-- Signal processing for AI interpretation
-- Pre-processing of reasoning inputs
-- Supporting orchestration layer decisions
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(core_cognition.py)
-
-This file MUST NOT:
-- Handle user I/O directly
-- Execute tools or external commands
-- Access databases directly
-- Perform API/network calls
-- Format final AI responses
-- Manage UI or routing logic
-
-It ONLY provides cognitive computation utilities.
-
-========================================================
-COGNITIVE FLOW ROLE:
-
-Input Signal
-    ↓
-pattern analysis
-    ↓
-context weighting
-    ↓
-reasoning evaluation
-    ↓
-decision scoring
-    ↓
-output cognitive signals
-    ↓
-used by ai_orchestrator.py
-
-========================================================
-SYSTEM WIDE POSITION:
-
-User Input
-    ↓
-api_gateway.py
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-core_cognition.py   ← THIS FILE (support engine)
-    ↓
-tool_executor.py (if needed)
-    ↓
-external_toolkit.py
-    ↓
-memory_database.py
-    ↓
-model_registry.py
-    ↓
-api_gateway.py
-    ↓
-UI
-
-========================================================
-KEY DEPENDENCIES:
-
-core_cognition.py is used by:
-- ai_orchestrator.py
-- request_router.py
-- memory_context_builder.py
-
-It may reference:
-- config_loader.py
-- system_utils.py
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- pattern_score()
-- intent_weighting()
-- context_evaluator()
-- decision_ranker()
-- cognitive_fusion()
-- signal_normalizer()
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Pure Cognition Without Action"
-
-- No execution
-- No persistence
-- No user interface
-- Only structured thinking logic
-
-========================================================
+Boundaries:
+- Cognition supplies reasoning support; it does not own authorization, permissions, security decisions, memory policy, or tool policy.
+- Its outputs are structured signals, not public private-reasoning traces.
+- The Cognitive Decision Engine and Reasoning Engine are planned services and are not implicitly implemented by this module.
 """
 
 

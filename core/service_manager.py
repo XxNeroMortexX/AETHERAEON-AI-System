@@ -1,3 +1,22 @@
+"""
+Aetheraeon AI - Service Manager
+
+Purpose:
+Controls the supported lifecycle of services registered with the current Aetheraeon runtime.
+
+Architecture Layer:
+Service Infrastructure Layer - service control.
+
+Responsibilities:
+- Start, stop, restart, and query supported services through established service definitions.
+- Return structured lifecycle and status results to authorized callers.
+- Coordinate service operations without embedding service-specific policy in other layers.
+
+Boundaries:
+- This module does not grant permissions, make cognitive decisions, execute AI tools, or determine user intent.
+- Callers must enforce authorization and security requirements before service-control operations.
+"""
+
 import shutil
 import psutil
 import time

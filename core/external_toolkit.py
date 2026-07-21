@@ -1,127 +1,21 @@
 """
-========================================================
-AETHERAEON — EXTERNAL TOOL EXECUTION LAYER
-========================================================
+Aetheraeon AI - External Toolkit
 
-FILE PURPOSE:
-This file is responsible for interacting with ALL external
-systems outside the core AI architecture.
+Purpose:
+Provides controlled adapters for interacting with external APIs, services, automation systems, and operating-system resources.
 
-It acts as the bridge between the AI system and the real world.
+Architecture Layer:
+Tool Execution Layer - external integration boundary.
 
-These include:
-- web requests
-- APIs
-- system calls
-- automation services
-- third-party integrations (n8n, browser tools, etc)
+Responsibilities:
+- Perform approved external operations requested through existing execution paths.
+- Normalize external results, errors, and operational metadata.
+- Isolate provider-specific interaction details from cognitive components.
 
-========================================================
-SYSTEM ROLE:
-"Action Layer" of the architecture.
-
-It does NOT think.
-It does NOT reason.
-It ONLY executes external operations safely.
-
-========================================================
-RESPONSIBILITIES:
-(external_toolkit.py)
-
-- Execute HTTP/API requests
-- Interact with external services (web, APIs, automation tools)
-- Trigger automation workflows (n8n, webhooks, etc)
-- Perform controlled system interactions
-- Return raw external results to tool_executor
-- Normalize external responses into structured format
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(external_toolkit.py)
-
-This file MUST NOT:
-- Perform AI reasoning or interpretation (core_cognition.py handles this)
-- Make tool decisions (tool_executor.py handles this)
-- Access or modify memory (memory_database.py handles this)
-- Handle request routing (request_router.py handles this)
-- Contain business logic beyond execution
-
-It ONLY executes and returns raw results.
-
-========================================================
-EXECUTION FLOW:
-
-Tool Request Received
-    ↓
-validate_tool_request()
-    ↓
-route_to_external_service()
-    ↓
-execute_http_call / system_call / webhook
-    ↓
-capture raw response
-    ↓
-normalize_output()
-    ↓
-return structured result to tool_executor
-
-========================================================
-SYSTEM WIDE POSITION:
-
-User Input
-    ↓
-api_gateway.py
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-tool_executor.py
-    ↓
-external_toolkit.py   ← THIS FILE
-    ↓
-external services (APIs / Web / Automation)
-    ↓
-response returned back up chain
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-external_toolkit.py is used by:
-- tool_executor.py        (primary caller)
-- request_router.py       (fallback tool routing)
-- automation_playbooks.py (workflow execution)
-- system integrations (n8n, webhooks, APIs)
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- execute_http_request()
-- call_webhook()
-- run_system_command()
-- trigger_automation()
-- fetch_external_data()
-- normalize_external_response()
-
-========================================================
-OUTPUT CONTRACT:
-
-This module returns:
-- raw_response (external system output)
-- status_code
-- success/failure state
-- normalized_data (if applicable)
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Separation of Thinking and Acting"
-
-- AI THINKS (core_cognition)
-- TOOL EXECUTES (tool_executor)
-- EXTERNAL WORLD RESPONDS (external_toolkit)
-
-========================================================
+Boundaries:
+- This module does not select tools, infer intent, authorize actions, or establish cognitive policy.
+- Tool executors and security components validate operations before execution, and security remains authoritative.
+- External results do not directly modify memory or become trusted facts without the appropriate decision and validation flow.
 """
 
 # ============================================================

@@ -1,157 +1,21 @@
 """
-========================================================
-AETHERAEON — MODEL REGISTRY (MODEL ROUTING LAYER)
-========================================================
+Aetheraeon AI - Model Registry
 
-FILE PURPOSE:
-This file is the centralized model management and routing
-system for the entire AI architecture.
+Purpose:
+Discovers available models and provides normalized model capability and configuration information.
 
-It controls:
-- Which AI model should be used
-- When models should switch
-- Model capability definitions
-- Routing policies
-- Fallback handling
-- Performance-aware model selection
+Architecture Layer:
+Core Intelligence Layer - model management support.
 
-========================================================
-SYSTEM ROLE:
-"Model Intelligence Routing Layer"
+Responsibilities:
+- Query and normalize the current model inventory.
+- Match configured defaults and capability requirements to available models.
+- Provide model metadata to routing, orchestration, and model-communication callers.
 
-This file does NOT perform reasoning itself.
-
-It ONLY:
-- Defines available models
-- Selects the correct model for a task
-- Returns model configuration data
-- Handles model fallback policies
-- Maintains routing consistency
-
-========================================================
-RESPONSIBILITIES:
-(model_registry.py)
-
-- Register all available AI models
-- Define model metadata + capabilities
-- Route tasks to correct model
-- Handle fallback model selection
-- Define local vs cloud model policies
-- Store model context window limits
-- Store model temperature defaults
-- Define reasoning vs utility model roles
-- Validate model availability
-- Support future multi-model orchestration
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(model_registry.py)
-
-This file MUST NOT:
-
-- Call models directly (llm_interface.py handles this)
-- Execute tools (tool_executor.py handles this)
-- Access databases (memory_database.py handles this)
-- Perform AI reasoning
-- Build prompts
-- Modify frontend/UI state
-- Execute HTTP/API routes
-
-This file ONLY manages model configuration + routing.
-
-========================================================
-MODEL REGISTRY INTERNAL FLOW:
-(model_registry.py functions)
-
-AI Request
-    ↓
-get_model_for_task()
-    ↓
-check_model_availability()
-    ↓
-apply_routing_rules()
-    ↓
-fallback_if_needed()
-    ↓
-return structured model configuration
-    ↓
-llm_interface.py executes model
-
-========================================================
-SYSTEM WIDE FLOW:
-(full architecture flow)
-
-User Input
-    ↓
-api_gateway.py
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-model_registry.py   ← THIS FILE
-    ↓
-llm_interface.py
-    ↓
-selected AI model executes
-    ↓
-tool_executor.py (if needed)
-    ↓
-response returned upward
-    ↓
-Web UI
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-model_registry.py is used by:
-- ai_orchestrator.py
-- llm_interface.py
-- request_router.py
-- tool_executor.py (optional future routing)
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- register_model()
-- get_model()
-- get_default_model()
-- get_reasoning_model()
-- get_fast_model()
-- get_fallback_model()
-- get_model_for_task()
-- list_available_models()
-- check_model_availability()
-
-========================================================
-OUTPUT CONTRACT:
-(model_registry.py returns)
-
-Structured model configuration objects:
-
-{
-    "model": str,
-    "provider": str,
-    "context_window": int,
-    "temperature": float,
-    "supports_tools": bool,
-    "supports_reasoning": bool
-}
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Centralized Model Control"
-
-- Registry defines models
-- Orchestrator decides intent
-- LLM Interface performs execution
-- tool_executor performs actions
-
-The registry remains:
-predictable, centralized, and stateless.
-
-========================================================
+Boundaries:
+- Registry selection is configuration and capability matching, not cognitive policy.
+- This module does not infer user intent, perform model inference, authorize tools, or make memory decisions.
+- The planned Cognitive Decision Engine may supply model requirements but is not implemented by this registry.
 """
 
 

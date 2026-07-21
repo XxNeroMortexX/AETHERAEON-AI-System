@@ -1,96 +1,21 @@
 """
-========================================================
-AETHERAEON — SYSTEM DEBUG LAYER (DEVELOPMENT INTELLIGENCE)
-========================================================
+Aetheraeon AI - System Debug
 
-FILE PURPOSE:
-This file is responsible for debugging, tracing, and
-observability across the AI system.
+Purpose:
+Provides passive diagnostic visibility into current component activity and execution outcomes.
 
-It provides structured visibility into:
-- internal AI reasoning flow
-- tool execution paths
-- memory operations
-- system performance
-- error tracking and diagnostics
+Architecture Layer:
+Cognitive Observability Layer - development diagnostics support.
 
-========================================================
-SYSTEM ROLE:
-"Observer Layer" of the architecture.
+Responsibilities:
+- Format safe operational summaries for requests, tools, memory operations, errors, and timing.
+- Correlate current diagnostic events without changing application behavior.
+- Support troubleshooting through existing logging and debug surfaces.
 
-It does NOT influence AI decisions.
-It ONLY observes, logs, and reports system behavior.
-
-========================================================
-RESPONSIBILITIES:
-(system_debug.py)
-
-- Capture debug logs from orchestrator and tools
-- Trace execution flow across system layers
-- Monitor memory read/write behavior
-- Track tool execution inputs and outputs
-- Record performance timing metrics
-- Format structured debug reports
-- Assist development and system diagnostics
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(system_debug.py)
-
-This file MUST NOT:
-- Modify AI reasoning output
-- Execute tools or external commands
-- Access or mutate database state
-- Change system configuration
-- Influence orchestration logic
-
-It ONLY observes and reports system behavior.
-
-========================================================
-DEBUG FLOW INTEGRATION:
-
-User Input
-    ↓
-ai_orchestrator.py
-    ↓
-(tool execution + memory flow)
-    ↓
-system_debug.py (passive observation layer)
-    ↓
-logs / structured debug output
-    ↓
-system_logger.py / debugging tools
-
-========================================================
-SYSTEM WIDE DEBUG COVERAGE:
-
-This module can observe:
-- request_router.py
-- ai_orchestrator.py
-- tool_executor.py
-- memory_database.py
-- llm_interface.py
-- external_toolkit.py
-
-========================================================
-KEY DEBUG OUTPUT TYPES:
-
-- execution_trace
-- memory_trace
-- tool_trace
-- error_trace
-- performance_trace
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Observe Everything, Change Nothing"
-
-- Debug layer is passive
-- No side effects allowed
-- Full transparency for AI reasoning pipeline
-
-========================================================
+Boundaries:
+- This module does not make decisions, execute actions, modify state, or authorize operations.
+- Diagnostics must not capture private chain-of-thought, hidden reasoning traces, private prompts, secrets, credentials, or raw embeddings.
+- Cognitive Trace and the Admin Cognitive Inspector are planned observability capabilities, not implicitly implemented here.
 """
 
 

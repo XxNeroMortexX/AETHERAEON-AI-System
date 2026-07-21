@@ -1,129 +1,21 @@
 """
-========================================================
-AETHERAEON — JSON HELPER UTILITIES
-========================================================
+Aetheraeon AI - JSON Helpers
 
-FILE PURPOSE:
-This file contains low-level JSON parsing, validation,
-repair, extraction, and normalization utilities used
-across the AI system.
+Purpose:
+Provides reusable JSON extraction, repair, parsing, and normalization utilities.
 
-It provides safe structured-data handling for:
-- LLM outputs
-- tool routing
-- memory payloads
-- API responses
-- configuration parsing
+Architecture Layer:
+Utility and Support Layer - structured data handling.
 
-========================================================
-SYSTEM ROLE:
-"Structured Data Utility Layer"
+Responsibilities:
+- Recover structured JSON from supported text outputs.
+- Normalize parsing results and report malformed data safely.
+- Support API, model, routing, memory, and tool callers without owning their policies.
 
-This file acts as the system-wide JSON safety and
-normalization engine.
-
-It ensures unreliable or malformed AI outputs can be:
-- repaired
-- extracted
-- validated
-- normalized
-- safely converted into Python objects
-
-========================================================
-RESPONSIBILITIES:
-(json_helpers.py)
-
-- Extract JSON from mixed text
-- Repair malformed JSON-like outputs
-- Normalize structured payloads
-- Validate JSON formatting
-- Clean escaped characters
-- Convert AI responses into safe dictionaries
-- Provide reusable parsing utilities
-- Prevent JSON parsing crashes system-wide
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(json_helpers.py)
-
-This file MUST NOT:
-- Call databases
-- Execute tools
-- Perform AI orchestration
-- Modify memory systems
-- Handle frontend/UI rendering
-- Perform HTTP/API requests
-- Contain business logic
-
-This file ONLY handles structured data utilities.
-
-========================================================
-SYSTEM USAGE FLOW:
-(json_helpers.py usage)
-
-LLM Output
-    ↓
-json_helpers.py
-    ↓
-Extract JSON
-    ↓
-Repair malformed structures
-    ↓
-Normalize payload
-    ↓
-Validate structure
-    ↓
-Return safe Python object
-    ↓
-request_router.py / tool_executor.py
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-Used by:
-- ai_orchestrator.py
-- request_router.py
-- tool_executor.py
-- api_gateway.py
-- memory_database.py
-- automation_playbooks.py
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- extract_json_object()
-- repair_json_like()
-- normalize_json_payload()
-- validate_json_response()
-- safe_json_loads()
-- clean_json_text()
-
-========================================================
-OUTPUT CONTRACT:
-(json_helpers.py returns)
-
-- validated dictionaries
-- repaired JSON strings
-- normalized structured payloads
-- safe fallback objects
-- parsing diagnostics (optional)
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Structure Before Execution"
-
-- AI may generate imperfect outputs
-- The system must stabilize structure first
-- Safe parsing prevents cascading failures
-
-This layer exists to make the AI architecture:
-- resilient
-- fault tolerant
-- modular
-- predictable
-
-========================================================
+Boundaries:
+- JSON repair does not determine intent, truth, authorization, or execution policy.
+- This module does not call models, databases, tools, or external services.
+- It does not expose or reconstruct private chain-of-thought.
 """
 
 # ============================================================

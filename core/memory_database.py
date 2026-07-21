@@ -1,154 +1,22 @@
 """
-========================================================
-AETHERAEON — PERSISTENCE DATABASE LAYER
-========================================================
+Aetheraeon AI - Persistence Database
 
-FILE PURPOSE:
+Purpose:
+Provides the current persistence implementation for structured application data and long-term semantic memory.
 
-This file currently provides the central persistence
-implementation layer for the Aetheraeon AI system.
+Architecture Layer:
+Persistence and Storage Layer.
 
-It manages storage and retrieval operations for:
+Responsibilities:
+- Execute current MariaDB operations for users, settings, conversations, messages, and related records.
+- Execute current ChromaDB operations for approved long-term semantic-memory storage and recall.
+- Return structured persistence results, identifiers, and failure information to calling interfaces.
 
-- User identity data
-- Conversations
-- Messages
-- User settings
-- Automation playbooks
-- Long-term semantic memory (ChromaDB)
-
-This file acts as the current backend storage provider
-until the persistence layer is separated into dedicated
-repository components.
-
-========================================================
-SYSTEM ROLE:
-
-"Persistence Layer"
-
-Current Responsibility:
-
-This file provides:
-- Database communication
-- Storage operations
-- Retrieval operations
-- Data persistence
-- ChromaDB semantic memory access
-
-
-IMPORTANT ARCHITECTURE NOTE:
-
-This file is intentionally planned for future
-decomposition.
-
-As the system matures, responsibilities should be
-migrated into dedicated repository modules.
-
-========================================================
-TARGET FUTURE ARCHITECTURE:
-
-database/
-│
-├── database_connection.py
-│       MariaDB connection management
-│
-├── user_repository.py
-│       User identity and account data
-│
-├── conversation_repository.py
-│       Conversations and message history
-│
-├── settings_repository.py
-│       User configuration storage
-│
-├── playbook_repository.py
-│       Automation workflow storage
-│
-└── memory_repository.py
-        ChromaDB semantic memory
-
-
-Future access pattern:
-
-memory_interface.py
-
-        |
-        |
-        ├── memory_repository.py
-        |
-        ├── conversation_repository.py
-        |
-        └── other persistence repositories
-
-
-The goal is to prevent higher-level AI components
-from directly depending on database implementations.
-
-========================================================
-CURRENT RESPONSIBILITIES:
-
-(memory_database.py)
-
-- Manage MariaDB operations
-- Manage ChromaDB operations
-- Store structured records
-- Retrieve persistent data
-- Update stored information
-- Delete persistent records
-- Provide normalized storage results
-
-========================================================
-STRICT BOUNDARIES:
-
-This file MUST NOT:
-
-- Perform AI reasoning
-- Generate AI responses
-- Execute tools
-- Handle HTTP requests
-- Control frontend behavior
-- Make intelligence decisions
-- Perform business logic unrelated to storage
-
-This layer only manages persistence.
-
-========================================================
-ARCHITECTURAL DIRECTION:
-
-Current:
-
-AI Layers
-    ↓
-memory_interface.py
-    ↓
-memory_database.py
-    ↓
-MariaDB / ChromaDB
-
-
-Future:
-
-AI Layers
-    ↓
-memory_interface.py
-    ↓
-Repository Layer
-    ↓
-Database / Vector Storage
-
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Storage Should Be Predictable"
-
-Persistence stores state.
-Persistence does not create intelligence.
-
-The database remembers.
-The cognitive system understands.
-
-========================================================
+Boundaries:
+- Storage persists approved information; it does not decide significance, scope, candidacy, retrieval policy, or cognitive truth.
+- ChromaDB is the current semantic-memory implementation, not a permanent architectural requirement.
+- This module does not automatically forget, expire, or delete retained memory without an authorized operation.
+- Planned repository decomposition is not implemented merely by this module header.
 """
 
 
@@ -161,8 +29,11 @@ The cognitive system understands.
 # - pattern matching
 # ============================================================
 
-import uuid   # Unique identifiers for memory entries (ChromaDB + SQL IDs)
+import base64
+import binascii
+import json
 import re     # Text chunking, filtering, and pattern cleanup
+import uuid   # Unique identifiers for memory entries (ChromaDB + SQL IDs)
 
 
 # ============================================================
@@ -417,8 +288,6 @@ def get_chroma_collection():
     - None if initialization failed
     """
 
-    global CHROMA_COLLECTION
-
     # --------------------------------------------------------
     # INITIALIZE CHROMADB COLLECTION IF NOT READY
     # --------------------------------------------------------
@@ -504,7 +373,12 @@ def chroma_store(text, meta=None):
     text = str(text).strip()
 
     if not text:
-        return
+        return {
+            "success": False,
+            "ids": [],
+            "count": 0,
+            "reason": "Memory content is empty.",
+        }
 
     # ─────────────────────────────────────────────
     # 2. SYSTEM NOISE FILTERING
@@ -524,10 +398,20 @@ def chroma_store(text, meta=None):
     )
 
     if any(text.startswith(sig) for sig in noise_signatures):
-        return
+        return {
+            "success": False,
+            "ids": [],
+            "count": 0,
+            "reason": "Memory content was rejected by the system-noise filter.",
+        }
 
     if "AI explained" in text or "Tool usage rules" in text:
-        return
+        return {
+            "success": False,
+            "ids": [],
+            "count": 0,
+            "reason": "Memory content was rejected by the memory safety filter.",
+        }
 
     # ─────────────────────────────────────────────
     # 3. SEMANTIC CHUNKING ENGINE
@@ -579,6 +463,8 @@ def chroma_store(text, meta=None):
         "source": "user"
     }
 
+    explicit_memory_type = None
+
     if meta:
         sanitized_meta = {}
 
@@ -590,6 +476,7 @@ def chroma_store(text, meta=None):
             sanitized_meta[key] = str(value)
 
         base_metadata.update(sanitized_meta)
+        explicit_memory_type = str(sanitized_meta.get("type") or "").strip() or None
 
     # ─────────────────────────────────────────────
     # 6. PERSISTENCE LAYER — CHROMADB INSERTION
@@ -597,20 +484,43 @@ def chroma_store(text, meta=None):
 
     collection = get_chroma_collection()
     if collection is None:
-        return
+        return {
+            "success": False,
+            "ids": [],
+            "count": 0,
+            "reason": "ChromaDB collection is unavailable.",
+        }
 
+    stored_ids = []
     for memory_text in memory_chunks:
 
-        memory_type = classify_memory_type(memory_text)
+        memory_type = explicit_memory_type or classify_memory_type(memory_text)
 
         final_metadata = dict(base_metadata)
         final_metadata["type"] = memory_type
 
-        collection.add(
-            documents=[memory_text],
-            metadatas=[final_metadata],
-            ids=[str(uuid.uuid4())]
-        )
+        memory_id = str(uuid.uuid4())
+        try:
+            collection.add(
+                documents=[memory_text],
+                metadatas=[final_metadata],
+                ids=[memory_id]
+            )
+            stored_ids.append(memory_id)
+        except Exception as error:
+            return {
+                "success": False,
+                "ids": stored_ids,
+                "count": len(stored_ids),
+                "reason": str(error) or type(error).__name__,
+            }
+
+    return {
+        "success": bool(stored_ids),
+        "ids": stored_ids,
+        "count": len(stored_ids),
+        "reason": None if stored_ids else "ChromaDB did not insert a memory.",
+    }
         
         
 # ============================================================
@@ -686,7 +596,7 @@ def chroma_recall(query, n=3):
 # CHROMADB — SEMANTIC RECALL (WITH METADATA)
 # ============================================================
 
-def chroma_recall_with_meta(query, n=5):
+def chroma_recall_with_meta(query, n=5, user_id=None, return_status=False):
     """
     ============================================================
     CHROMADB — FULL MEMORY RECALL (IDS + CONTENT + METADATA)
@@ -711,8 +621,17 @@ def chroma_recall_with_meta(query, n=5):
     # 1. SAFETY GUARDS
     # ─────────────────────────────────────────────
 
+    def recall_result(results, attempted, completed, error=None):
+        if return_status:
+            return results, {
+                "attempted": bool(attempted),
+                "completed": bool(completed),
+                "error": str(error) if error else None,
+            }
+        return results
+
     if not query:
-        return []
+        return recall_result([], False, False, "Memory search query is empty.")
 
     # ─────────────────────────────────────────────
     # 2. COLLECTION ACCESS LAYER
@@ -721,17 +640,22 @@ def chroma_recall_with_meta(query, n=5):
     collection = get_chroma_collection()
 
     if collection is None:
-        return []
+        return recall_result([], True, False, "ChromaDB collection is unavailable.")
 
     # ─────────────────────────────────────────────
     # 3. VECTOR SEARCH EXECUTION
     # ─────────────────────────────────────────────
 
     try:
+        query_options = {
+            "query_texts": [query],
+            "n_results": n,
+            "include": ["documents", "metadatas", "distances"],
+        }
+        if user_id is not None:
+            query_options["where"] = {"user_id": str(user_id)}
         search_results = collection.query(
-            query_texts=[query],
-            n_results=n,
-            include=["documents", "metadatas", "distances"]
+            **query_options
         )
 
         print("[CHROMA SEARCH DEBUG]")
@@ -791,13 +715,13 @@ def chroma_recall_with_meta(query, n=5):
                     )
                 )
 
-        return results
+        return recall_result(results, True, True)
 
-    except Exception:
+    except Exception as error:
         # ─────────────────────────────────────────────
         # 5. FAILSAFE ERROR HANDLING
         # ─────────────────────────────────────────────
-        return []
+        return recall_result([], True, False, error)
         
         
 
@@ -805,7 +729,7 @@ def chroma_recall_with_meta(query, n=5):
 # CHROMADB — MEMORY FILTERING BY TYPE
 # ============================================================
 
-def chroma_get_by_type(mtype, limit=50):
+def chroma_get_by_type(mtype, limit=50, user_id=None):
     """
     ============================================================
     CHROMADB — FILTERED MEMORY RETRIEVAL (BY TYPE)
@@ -846,10 +770,10 @@ def chroma_get_by_type(mtype, limit=50):
     # ─────────────────────────────────────────────
 
     try:
-        search_results = collection.get(
-            where={"type": mtype},
-            limit=limit
-        )
+        where = {"type": mtype}
+        if user_id is not None:
+            where = {"$and": [{"type": mtype}, {"user_id": str(user_id)}]}
+        search_results = collection.get(where=where, limit=limit)
 
         # ─────────────────────────────────────────────
         # 4. RESPONSE NORMALIZATION
@@ -884,7 +808,7 @@ def chroma_get_by_type(mtype, limit=50):
 # CHROMADB — FULL MEMORY RETRIEVAL (ALL ENTRIES)
 # ============================================================
 
-def chroma_get_all(limit=200):
+def chroma_get_all(limit=200, user_id=None, return_diagnostics=False):
     """
     ============================================================
     CHROMADB — FULL MEMORY DUMP (ADMIN / DEBUG USE)
@@ -915,14 +839,18 @@ def chroma_get_all(limit=200):
     collection = get_chroma_collection()
 
     if collection is None:
-        return []
+        diagnostics = {"completed": False, "error": "collection_unavailable"}
+        return ([], diagnostics) if return_diagnostics else []
 
     # ─────────────────────────────────────────────
     # 3. RAW DATA RETRIEVAL
     # ─────────────────────────────────────────────
 
     try:
-        search_results = collection.get(limit=limit)
+        options = {"limit": limit}
+        if user_id is not None:
+            options["where"] = {"user_id": str(user_id)}
+        search_results = collection.get(**options)
 
         # ─────────────────────────────────────────────
         # 4. RESPONSE NORMALIZATION
@@ -943,18 +871,51 @@ def chroma_get_all(limit=200):
         metadatas = search_results.get("metadatas", [])
 
         results = list(zip(ids, documents, metadatas))
-        return results
+        diagnostics = {"completed": True, "error": None}
+        return (results, diagnostics) if return_diagnostics else results
 
-    except Exception:
+    except Exception as error:
         # ─────────────────────────────────────────────
         # 5. FAILSAFE ERROR HANDLING
         # ─────────────────────────────────────────────
-        return []
+        diagnostics = {
+            "completed": False,
+            "error": type(error).__name__,
+        }
+        return ([], diagnostics) if return_diagnostics else []
         
         
 # ============================================================
 # CHROMADB — DELETE MEMORY ENTRY (BY ID)
 # ============================================================
+
+def _chroma_entry_exists(collection, memory_id):
+    """Confirm that a specific Chroma record currently exists."""
+
+    try:
+        result = collection.get(ids=[memory_id])
+    except Exception:
+        return False
+
+    ids = result.get("ids") if isinstance(result, dict) else None
+    return isinstance(ids, list) and memory_id in ids
+
+
+def _chroma_entry_text_matches(collection, memory_id, expected_text):
+    """Confirm that a completed update is visible through Chroma."""
+
+    try:
+        result = collection.get(ids=[memory_id], include=["documents"])
+    except Exception:
+        return False
+
+    if not isinstance(result, dict):
+        return False
+    return (
+        memory_id in (result.get("ids") or [])
+        and expected_text in (result.get("documents") or [])
+    )
+
 
 def chroma_delete_by_id(memory_id):
     """
@@ -996,8 +957,10 @@ def chroma_delete_by_id(memory_id):
     # ─────────────────────────────────────────────
 
     try:
+        if not _chroma_entry_exists(collection, memory_id):
+            return False
         collection.delete(ids=[memory_id])
-        return True
+        return not _chroma_entry_exists(collection, memory_id)
 
     except Exception:
         # ─────────────────────────────────────────────
@@ -1039,6 +1002,7 @@ def chroma_update_by_id(memory_id, new_text, new_metadata=None):
     if not memory_id or not new_text:
         return False
 
+
     # ─────────────────────────────────────────────
     # 2. BASE METADATA STRUCTURE
     # ─────────────────────────────────────────────
@@ -1071,12 +1035,14 @@ def chroma_update_by_id(memory_id, new_text, new_metadata=None):
     # ─────────────────────────────────────────────
 
     try:
+        if not _chroma_entry_exists(collection, memory_id):
+            return False
         collection.update(
             ids=[memory_id],
             documents=[new_text],
             metadatas=[base_metadata]
         )
-        return True
+        return _chroma_entry_text_matches(collection, memory_id, new_text)
 
     except Exception:
         # ─────────────────────────────────────────────
@@ -1089,7 +1055,47 @@ def chroma_update_by_id(memory_id, new_text, new_metadata=None):
 # CHROMADB — SIMILAR MEMORY DETECTION (DEDUPLICATION)
 # ============================================================
 
-def chroma_exists_similar(text, threshold=0.95):
+def chroma_delete_by_user(user_id) -> bool:
+    """Delete long-term vector memories explicitly owned by one account."""
+    if user_id is None:
+        return False
+    collection = get_chroma_collection()
+    if collection is None:
+        return False
+    try:
+        collection.delete(where={"user_id": str(user_id)})
+        return True
+    except Exception:
+        return False
+
+
+def chroma_claim_legacy_memories(user_id) -> int:
+    """Assign pre-user-isolation memories to the bootstrap administrator."""
+    if user_id is None:
+        return 0
+    collection = get_chroma_collection()
+    if collection is None:
+        return 0
+    try:
+        records = collection.get(include=["metadatas"])
+        legacy_ids = []
+        claimed_metadata = []
+        for memory_id, metadata in zip(
+            records.get("ids", []), records.get("metadatas", [])
+        ):
+            normalized_metadata = dict(metadata or {})
+            if normalized_metadata.get("user_id") in (None, ""):
+                normalized_metadata["user_id"] = str(user_id)
+                legacy_ids.append(memory_id)
+                claimed_metadata.append(normalized_metadata)
+        if legacy_ids:
+            collection.update(ids=legacy_ids, metadatas=claimed_metadata)
+        return len(legacy_ids)
+    except Exception:
+        return 0
+
+
+def chroma_exists_similar(text, threshold=0.95, user_id=None):
     """
     ============================================================
     CHROMADB — DUPLICATE MEMORY DETECTION
@@ -1130,10 +1136,13 @@ def chroma_exists_similar(text, threshold=0.95):
     # ─────────────────────────────────────────────
 
     try:
-        search_results = collection.query(
-            query_texts=[text],
-            n_results=3
-        )
+        query_options = {
+            "query_texts": [text],
+            "n_results": 3,
+        }
+        if user_id is not None:
+            query_options["where"] = {"user_id": str(user_id)}
+        search_results = collection.query(**query_options)
 
         documents = search_results.get("documents", [[]])[0]
         distances = search_results.get("distances", [[]])[0]
@@ -1263,7 +1272,7 @@ def create_user(
     - Inserts user into MariaDB users table
     - Stores hashed password (NEVER plaintext)
     - Assigns default role = 'user'
-    - Handles system bootstrap (first user becomes admin)
+    - Handles system bootstrap (first user becomes owner)
 
     RETURNS:
     - Newly created user ID (int)
@@ -1287,13 +1296,15 @@ def create_user(
         # Stores all core identity fields in users table
         # ─────────────────────────────────────────
 
+        new_user_uid = str(uuid.uuid4())
         cursor.execute(
             """
             INSERT INTO users
-                (username, email, full_name, password_hash, role, is_active, avatar)
-            VALUES (%s, %s, %s, %s, 'user', 1, %s)
+                (user_uid, username, email, full_name, password_hash, role, is_active, avatar)
+            VALUES (%s, %s, %s, %s, %s, 'user', 1, %s)
             """,
             (
+                new_user_uid,
                 username,
                 email,
                 full_name,
@@ -1311,15 +1322,22 @@ def create_user(
         # 3. SYSTEM BOOTSTRAP LOGIC (FIRST USER)
         # ─────────────────────────────────────────
         # If this is the first user in system,
-        # promote them to ADMIN automatically.
+        # establish them as the single OWNER automatically.
         # ─────────────────────────────────────────
 
-        if new_user_id == 1:
+        cursor.execute("SELECT COUNT(*) FROM users")
+        is_first_account = int(cursor.fetchone()[0]) == 1
+        if is_first_account:
             cursor.execute(
-                "UPDATE users SET role = 'admin' WHERE id = %s",
+                "UPDATE users SET role = 'owner' WHERE id = %s",
                 (new_user_id,)
             )
             db_connection.commit()
+
+        # Workspace provisioning is identity setup only. It creates the
+        # account's empty sandbox and dormant ACL; no file capability uses it.
+        from core.workspace_security import provision_user_foundation
+        provision_user_foundation(new_user_uid)
 
         return new_user_id
 
@@ -1813,7 +1831,7 @@ def delete_user(user_id: int) -> None:
             """
             DELETE m FROM messages m
             JOIN conversations c
-                ON c.conversation_id = m.conversation_id
+                ON c.id = m.conversation_id
             WHERE c.user_id = %s
             """,
             (user_id,)
@@ -1855,6 +1873,520 @@ def delete_user(user_id: int) -> None:
 
 
 # ============================================================
+# PHASE 1 SECURITY / ADMINISTRATION PERSISTENCE
+# ============================================================
+
+def _users_foreign_key_table_spec(cursor) -> tuple[str, str, str, str]:
+    """Return the exact users.id and users table storage attributes for FKs."""
+    cursor.execute(
+        """
+        SELECT COLUMN_TYPE
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'users'
+          AND COLUMN_NAME = 'id'
+        """
+    )
+    column_row = cursor.fetchone()
+    if not column_row:
+        raise RuntimeError("Cannot migrate security tables: users.id was not found")
+    user_id_type = str(column_row[0]).strip().lower()
+    if not re.fullmatch(
+        r"(?:tinyint|smallint|mediumint|int|bigint)(?:\(\d+\))?(?: unsigned)?",
+        user_id_type,
+    ):
+        raise RuntimeError("Cannot migrate security tables: unsupported users.id type")
+
+    cursor.execute(
+        """
+        SELECT ENGINE, TABLE_COLLATION
+        FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'users'
+        """
+    )
+    table_row = cursor.fetchone()
+    if not table_row:
+        raise RuntimeError("Cannot migrate security tables: users table was not found")
+    engine = str(table_row[0] or "").strip()
+    collation = str(table_row[1] or "").strip()
+    charset = collation.split("_", 1)[0]
+    if engine.lower() != "innodb":
+        raise RuntimeError("Cannot create foreign keys: users must use InnoDB")
+    for value in (engine, charset, collation):
+        if not re.fullmatch(r"[A-Za-z0-9_]+", value):
+            raise RuntimeError("Cannot migrate security tables: invalid table metadata")
+    return user_id_type, engine, charset, collation
+
+def ensure_user_identity_schema() -> None:
+    """Create and backfill the public UUID identity before any user query.
+
+    Existing non-null UUIDs are validation inputs only and are never rewritten.
+    Integer primary keys and all foreign-key relationships remain untouched.
+    """
+
+    print("[DATABASE MIGRATION]")
+    print("Checking user identity schema...")
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'users'
+              AND COLUMN_NAME = 'user_uid'
+            """
+        )
+        column = cursor.fetchone()
+        if column is None:
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN user_uid CHAR(36) NULL"
+            )
+            column_is_nullable = True
+        else:
+            data_type = str(column[0] or "").lower()
+            length = int(column[1] or 0)
+            column_is_nullable = str(column[2] or "YES").upper() == "YES"
+            if data_type != "char" or length != 36:
+                raise RuntimeError(
+                    "users.user_uid exists but is not CHAR(36); "
+                    "automatic conversion was refused"
+                )
+        print("[OK] user_uid column exists")
+
+        cursor.execute("SELECT id, user_uid FROM users ORDER BY id")
+        users = cursor.fetchall()
+        seen_uids = set()
+        missing_user_ids = []
+        for user_id, existing_uid in users:
+            if existing_uid is None:
+                missing_user_ids.append(user_id)
+                continue
+            existing_text = str(existing_uid).strip()
+            try:
+                uuid.UUID(existing_text)
+            except (ValueError, AttributeError, TypeError) as error:
+                raise RuntimeError(
+                    f"users.user_uid contains an invalid non-null UUID for id {user_id}"
+                ) from error
+            identity_key = existing_text.casefold()
+            if identity_key in seen_uids:
+                raise RuntimeError(
+                    "users.user_uid contains duplicate existing UUID values"
+                )
+            seen_uids.add(identity_key)
+
+        for user_id in missing_user_ids:
+            generated_uid = str(uuid.uuid4())
+            while generated_uid.casefold() in seen_uids:
+                generated_uid = str(uuid.uuid4())
+            cursor.execute(
+                "UPDATE users SET user_uid = %s "
+                "WHERE id = %s AND user_uid IS NULL",
+                (generated_uid, user_id),
+            )
+            seen_uids.add(generated_uid.casefold())
+        db_connection.commit()
+        print("[OK] UUID backfill complete")
+
+        cursor.execute(
+            """
+            SELECT INDEX_NAME
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'users'
+              AND NON_UNIQUE = 0
+            GROUP BY INDEX_NAME
+            HAVING COUNT(*) = 1
+               AND MAX(CASE WHEN COLUMN_NAME = 'user_uid' THEN 1 ELSE 0 END) = 1
+            LIMIT 1
+            """
+        )
+        unique_index = cursor.fetchone()
+        if unique_index is None:
+            cursor.execute(
+                "ALTER TABLE users ADD UNIQUE INDEX "
+                "uq_users_user_uid (user_uid)"
+            )
+
+        if column_is_nullable:
+            cursor.execute(
+                "ALTER TABLE users MODIFY COLUMN user_uid CHAR(36) NOT NULL"
+            )
+        db_connection.commit()
+        print("[OK] user_uid unique protection exists")
+        print("[OK] User identity ready")
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def ensure_security_schema() -> None:
+    """Apply additive role, activity, reset-token, and audit schema changes."""
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        user_id_type, users_engine, users_charset, users_collation = (
+            _users_foreign_key_table_spec(cursor)
+        )
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS role "
+            "VARCHAR(32) NOT NULL DEFAULT 'user'"
+        )
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active "
+            "TINYINT(1) NOT NULL DEFAULT 1"
+        )
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_activity "
+            "TIMESTAMP NULL DEFAULT NULL"
+        )
+        cursor.execute(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at "
+            "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP "
+            "ON UPDATE CURRENT_TIMESTAMP"
+        )
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id {user_id_type} NULL,
+                email_hash CHAR(64) NOT NULL,
+                token_hash CHAR(64) NULL,
+                requested_ip VARCHAR(64) NOT NULL,
+                expires_at DATETIME NULL,
+                used_at DATETIME NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY ix_reset_email_created (email_hash, created_at),
+                KEY ix_reset_ip_created (requested_ip, created_at),
+                UNIQUE KEY uq_reset_token_hash (token_hash),
+                CONSTRAINT fk_reset_user FOREIGN KEY (user_id)
+                    REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE={users_engine} DEFAULT CHARACTER SET {users_charset}
+              COLLATE {users_collation}
+            """
+        )
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                admin_user_id {user_id_type} NULL,
+                target_user_id {user_id_type} NULL,
+                action VARCHAR(100) NOT NULL,
+                details VARCHAR(500) NULL,
+                ip_address VARCHAR(64) NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY ix_admin_audit_created (created_at),
+                KEY ix_admin_audit_actor (admin_user_id, created_at),
+                CONSTRAINT fk_admin_audit_actor FOREIGN KEY (admin_user_id)
+                    REFERENCES users(id) ON DELETE SET NULL,
+                CONSTRAINT fk_admin_audit_target FOREIGN KEY (target_user_id)
+                    REFERENCES users(id) ON DELETE SET NULL
+            ) ENGINE={users_engine} DEFAULT CHARACTER SET {users_charset}
+              COLLATE {users_collation}
+            """
+        )
+        cursor.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS system_settings (
+                setting_key VARCHAR(100) NOT NULL,
+                setting_value TEXT NOT NULL,
+                updated_by {user_id_type} NULL,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (setting_key),
+                CONSTRAINT fk_system_settings_user FOREIGN KEY (updated_by)
+                    REFERENCES users(id) ON DELETE SET NULL
+            ) ENGINE={users_engine} DEFAULT CHARACTER SET {users_charset}
+              COLLATE {users_collation}
+            """
+        )
+        cursor.execute(
+            """
+            INSERT INTO system_settings (setting_key, setting_value)
+            VALUES ('maintenance_mode', '0'), ('session_generation', '1')
+            ON DUPLICATE KEY UPDATE setting_key = VALUES(setting_key)
+            """
+        )
+        db_connection.commit()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def get_system_setting(setting_key: str, default=None):
+    """Read one persisted global setting without exposing a write surface."""
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT setting_value FROM system_settings WHERE setting_key = %s",
+            (setting_key,),
+        )
+        row = cursor.fetchone()
+        return row[0] if row else default
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def set_system_setting(setting_key: str, setting_value, updated_by: int = None) -> None:
+    """Persist one allowlisted global setting through a parameterized upsert."""
+    if setting_key not in {"maintenance_mode", "session_generation"}:
+        raise ValueError("Unsupported system setting")
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO system_settings (setting_key, setting_value, updated_by)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                setting_value = VALUES(setting_value),
+                updated_by = VALUES(updated_by)
+            """,
+            (setting_key, str(setting_value), updated_by),
+        )
+        db_connection.commit()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def increment_session_generation(updated_by: int = None) -> int:
+    """Atomically invalidate sessions and return the new generation number."""
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO system_settings (setting_key, setting_value, updated_by)
+            VALUES ('session_generation', '1', %s)
+            ON DUPLICATE KEY UPDATE
+                setting_value = CAST(setting_value AS UNSIGNED) + 1,
+                updated_by = VALUES(updated_by)
+            """,
+            (updated_by,),
+        )
+        cursor.execute(
+            "SELECT setting_value FROM system_settings "
+            "WHERE setting_key = 'session_generation'"
+        )
+        generation = int(cursor.fetchone()[0])
+        db_connection.commit()
+        return generation
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def touch_user_activity(user_id: int) -> None:
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute("UPDATE users SET last_activity = NOW() WHERE id = %s", (user_id,))
+        db_connection.commit()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def list_users_for_admin() -> list[dict]:
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT id, user_uid, username, full_name, email, role, is_active, avatar,
+                   created_at, updated_at, last_login, last_activity,
+                   CASE WHEN is_active = 1
+                             AND last_activity >= (NOW() - INTERVAL 5 MINUTE)
+                        THEN 1 ELSE 0 END AS is_online
+            FROM users
+            ORDER BY username, id
+            """
+        )
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def count_active_admins() -> int:
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT COUNT(*) FROM users "
+            "WHERE role IN ('owner', 'admin') AND is_active = 1"
+        )
+        return int(cursor.fetchone()[0])
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def admin_update_user(user_id: int, changes: dict) -> bool:
+    """Update only explicitly allowlisted identity/access fields."""
+    allowed_columns = {
+        "username": "username",
+        "full_name": "full_name",
+        "email": "email",
+        "role": "role",
+        "is_active": "is_active",
+        "password_hash": "password_hash",
+    }
+    updates = []
+    values = []
+    for key, value in (changes or {}).items():
+        column = allowed_columns.get(key)
+        if column:
+            updates.append(f"{column} = %s")
+            values.append(value)
+    if not updates:
+        return False
+
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        values.append(user_id)
+        cursor.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = %s", tuple(values))
+        db_connection.commit()
+        return cursor.rowcount > 0
+    except mysql.connector.IntegrityError:
+        return False
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def write_admin_audit(
+    admin_user_id: int,
+    action: str,
+    target_user_id: int = None,
+    details: str = None,
+    ip_address: str = None,
+) -> None:
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO admin_audit_logs
+                (admin_user_id, target_user_id, action, details, ip_address)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (admin_user_id, target_user_id, action, details, ip_address),
+        )
+        db_connection.commit()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def get_admin_audit_logs(limit: int = 200) -> list[dict]:
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT a.id, a.action, a.details, a.ip_address, a.created_at,
+                   actor.username AS admin_username,
+                   target.username AS target_username
+            FROM admin_audit_logs a
+            LEFT JOIN users actor ON actor.id = a.admin_user_id
+            LEFT JOIN users target ON target.id = a.target_user_id
+            ORDER BY a.created_at DESC, a.id DESC
+            LIMIT %s
+            """,
+            (max(1, min(int(limit), 500)),),
+        )
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def password_reset_rate_count(email_hash: str, requested_ip: str, minutes: int = 15) -> int:
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        window_minutes = max(1, min(int(minutes), 1440))
+        cursor.execute(
+            f"""
+            SELECT COUNT(*) FROM password_reset_tokens
+            WHERE created_at >= (NOW() - INTERVAL {window_minutes} MINUTE)
+              AND (email_hash = %s OR requested_ip = %s)
+            """,
+            (email_hash, requested_ip),
+        )
+        return int(cursor.fetchone()[0])
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def create_password_reset_record(
+    user_id: int,
+    email_hash: str,
+    requested_ip: str,
+    token_hash: str = None,
+    expires_at=None,
+) -> None:
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            """
+            INSERT INTO password_reset_tokens
+                (user_id, email_hash, token_hash, requested_ip, expires_at)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (user_id, email_hash, token_hash, requested_ip, expires_at),
+        )
+        db_connection.commit()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def consume_password_reset_token(token_hash: str) -> int | None:
+    """Atomically mark a valid, unexpired token used and return its user id."""
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        db_connection.start_transaction()
+        cursor.execute(
+            """
+            SELECT id, user_id FROM password_reset_tokens
+            WHERE token_hash = %s AND used_at IS NULL AND expires_at > NOW()
+            FOR UPDATE
+            """,
+            (token_hash,),
+        )
+        record = cursor.fetchone()
+        if not record or not record.get("user_id"):
+            db_connection.rollback()
+            return None
+        cursor.execute(
+            "UPDATE password_reset_tokens SET used_at = NOW() WHERE id = %s AND used_at IS NULL",
+            (record["id"],),
+        )
+        if cursor.rowcount != 1:
+            db_connection.rollback()
+            return None
+        db_connection.commit()
+        return int(record["user_id"])
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+# ============================================================
 # USER SETTINGS — GET USER PREFERENCES
 # ============================================================
 
@@ -1871,6 +2403,22 @@ DEFAULT_USER_SETTINGS = {
     "response_detail": "normal",
     "humor_level": "low",
     "greeting_style": "friendly",
+    "show_processing_details": 1,
+    "processing_details_expanded": 0,
+    "processing_details_mode": "compact",
+    "font_family": "mono",
+    "font_size": 18,
+    "chat_text_size": 16,
+    "button_size": 16,
+    "menu_size": 16,
+    "header_size": 18,
+    "code_size": 15,
+    "text_style": "normal",
+    "custom_text_color": "",
+    "custom_chat_color": "",
+    "custom_ui_color": "",
+    "custom_accent_color": "",
+    "custom_theme_json": "{}",
 }
 
 
@@ -1895,6 +2443,42 @@ def ensure_user_settings_schema() -> None:
             "greeting_style VARCHAR(32) NOT NULL DEFAULT 'friendly'",
             "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS updated_at "
             "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "show_processing_details TINYINT(1) NOT NULL DEFAULT 1",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "processing_details_expanded TINYINT(1) NOT NULL DEFAULT 0",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "processing_details_mode VARCHAR(16) NOT NULL DEFAULT 'compact'",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "font_family VARCHAR(32) NOT NULL DEFAULT 'mono'",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "font_size SMALLINT UNSIGNED NOT NULL DEFAULT 18",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "chat_text_size SMALLINT UNSIGNED NOT NULL DEFAULT 16",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "button_size SMALLINT UNSIGNED NOT NULL DEFAULT 16",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "menu_size SMALLINT UNSIGNED NOT NULL DEFAULT 16",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "header_size SMALLINT UNSIGNED NOT NULL DEFAULT 18",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "code_size SMALLINT UNSIGNED NOT NULL DEFAULT 15",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "text_style VARCHAR(16) NOT NULL DEFAULT 'normal'",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "custom_text_color VARCHAR(16) NOT NULL DEFAULT ''",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "custom_chat_color VARCHAR(16) NOT NULL DEFAULT ''",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "custom_ui_color VARCHAR(16) NOT NULL DEFAULT ''",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "custom_accent_color VARCHAR(16) NOT NULL DEFAULT ''",
+            "ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS "
+            "custom_theme_json LONGTEXT NULL",
+            "ALTER TABLE user_settings ALTER COLUMN font_size SET DEFAULT 18",
+            "ALTER TABLE user_settings ALTER COLUMN chat_text_size SET DEFAULT 16",
+            "ALTER TABLE user_settings ALTER COLUMN button_size SET DEFAULT 16",
+            "ALTER TABLE user_settings ALTER COLUMN menu_size SET DEFAULT 16",
         )
 
         for statement in schema_updates:
@@ -1903,8 +2487,8 @@ def ensure_user_settings_schema() -> None:
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS user_personality_traits (
-                id INT NOT NULL AUTO_INCREMENT,
-                user_id INT NOT NULL,
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id INT UNSIGNED NOT NULL,
                 trait VARCHAR(255) NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (id),
@@ -2007,6 +2591,12 @@ def get_user_settings(user_id: int) -> dict:
                 for key, value in settings_row.items()
                 if value is not None
             })
+            try:
+                merged_settings["custom_theme"] = json.loads(
+                    merged_settings.get("custom_theme_json") or "{}"
+                )
+            except (TypeError, ValueError, json.JSONDecodeError):
+                merged_settings["custom_theme"] = {}
             return merged_settings
 
         # ─────────────────────────────────────────
@@ -2124,6 +2714,27 @@ def upsert_user_settings(user_id: int, settings: dict) -> None:
         response_detail = merged.get("response_detail", "normal")
         humor_level = merged.get("humor_level", "low")
         greeting_style = merged.get("greeting_style", "friendly")
+        show_processing_details = int(bool(merged.get("show_processing_details", 1)))
+        processing_details_expanded = int(bool(merged.get("processing_details_expanded", 0)))
+        processing_details_mode = merged.get("processing_details_mode", "compact")
+        font_family = merged.get("font_family", "mono")
+        font_size = int(merged.get("font_size", 18))
+        chat_text_size = int(merged.get("chat_text_size", 16))
+        button_size = int(merged.get("button_size", 16))
+        menu_size = int(merged.get("menu_size", 16))
+        header_size = int(merged.get("header_size", 18))
+        code_size = int(merged.get("code_size", 15))
+        text_style = merged.get("text_style", "normal")
+        custom_text_color = merged.get("custom_text_color", "")
+        custom_chat_color = merged.get("custom_chat_color", "")
+        custom_ui_color = merged.get("custom_ui_color", "")
+        custom_accent_color = merged.get("custom_accent_color", "")
+        custom_theme_value = merged.get("custom_theme", merged.get("custom_theme_json", "{}"))
+        custom_theme_json = (
+            json.dumps(custom_theme_value, separators=(",", ":"), sort_keys=True)
+            if isinstance(custom_theme_value, dict)
+            else str(custom_theme_value or "{}")
+        )
 
         # ─────────────────────────────────────────
         # 3. UPSERT OPERATION (INSERT OR UPDATE)
@@ -2146,9 +2757,27 @@ def upsert_user_settings(user_id: int, settings: dict) -> None:
                 response_tone,
                 response_detail,
                 humor_level,
-                greeting_style
+                greeting_style,
+                show_processing_details,
+                processing_details_expanded,
+                processing_details_mode,
+                font_family,
+                font_size,
+                chat_text_size,
+                button_size,
+                menu_size,
+                header_size,
+                code_size,
+                text_style,
+                custom_text_color,
+                custom_chat_color,
+                custom_ui_color,
+                custom_accent_color,
+                custom_theme_json
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s)
             ON DUPLICATE KEY UPDATE
                 preferred_router_model = VALUES(preferred_router_model),
                 preferred_chat_model = VALUES(preferred_chat_model),
@@ -2161,7 +2790,23 @@ def upsert_user_settings(user_id: int, settings: dict) -> None:
                 response_tone        = VALUES(response_tone),
                 response_detail      = VALUES(response_detail),
                 humor_level          = VALUES(humor_level),
-                greeting_style       = VALUES(greeting_style)
+                greeting_style       = VALUES(greeting_style),
+                show_processing_details = VALUES(show_processing_details),
+                processing_details_expanded = VALUES(processing_details_expanded),
+                processing_details_mode = VALUES(processing_details_mode),
+                font_family = VALUES(font_family),
+                font_size = VALUES(font_size),
+                chat_text_size = VALUES(chat_text_size),
+                button_size = VALUES(button_size),
+                menu_size = VALUES(menu_size),
+                header_size = VALUES(header_size),
+                code_size = VALUES(code_size),
+                text_style = VALUES(text_style),
+                custom_text_color = VALUES(custom_text_color),
+                custom_chat_color = VALUES(custom_chat_color),
+                custom_ui_color = VALUES(custom_ui_color),
+                custom_accent_color = VALUES(custom_accent_color),
+                custom_theme_json = VALUES(custom_theme_json)
             """,
             (
                 user_id,
@@ -2176,7 +2821,23 @@ def upsert_user_settings(user_id: int, settings: dict) -> None:
                 response_tone,
                 response_detail,
                 humor_level,
-                greeting_style
+                greeting_style,
+                show_processing_details,
+                processing_details_expanded,
+                processing_details_mode,
+                font_family,
+                font_size,
+                chat_text_size,
+                button_size,
+                menu_size,
+                header_size,
+                code_size,
+                text_style,
+                custom_text_color,
+                custom_chat_color,
+                custom_ui_color,
+                custom_accent_color,
+                custom_theme_json
             )
         )
 
@@ -2196,19 +2857,315 @@ def upsert_user_settings(user_id: int, settings: dict) -> None:
 # CONVERSATION SYSTEM — UUID → NUMERIC ID RESOLVER
 # ============================================================
 
-def get_user_personality_traits(user_id: int) -> list[dict]:
-    """Return only the authenticated user's ordered personality traits."""
+def _normalize_personality_trait(record: dict | None) -> dict | None:
+    if not record:
+        return record
+    normalized = dict(record)
+    normalized["name"] = normalized.get("name") or normalized.get("trait") or ""
+    normalized["trait"] = normalized["name"]  # legacy API compatibility
+    normalized["description"] = normalized.get("description") or ""
+    normalized["category"] = normalized.get("category") or "communication"
+    normalized["owner"] = normalized.get("owner") or "user"
+    normalized["strength"] = int(normalized.get("strength") or 0)
+    normalized["active"] = bool(normalized.get("active", True))
+    return normalized
+
+
+def _record_trait_history(cursor, user_id, trait_id, name, action, reason, source):
+    cursor.execute(
+        """
+        INSERT INTO personality_trait_history
+            (user_id, trait_id, trait_name, action, reason, source)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (user_id, trait_id, name, action, reason or "", source),
+    )
+
+
+def get_user_personality_traits(
+    user_id: int,
+    owner: str = None,
+    include_inactive: bool = False,
+) -> list[dict]:
+    """Return structured traits scoped to one authenticated user."""
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        filters = ["user_id = %s"]
+        params = [user_id]
+        if owner in {"user", "aetheraeon"}:
+            filters.append("owner = %s")
+            params.append(owner)
+        if not include_inactive:
+            filters.append("active = 1")
+        cursor.execute(
+            f"""
+            SELECT id, trait, name, description, category, strength, owner,
+                   created_by, reason_created, influence_summary, active,
+                   created_at, updated_at
+            FROM user_personality_traits
+            WHERE {' AND '.join(filters)}
+            ORDER BY created_at, id
+            """,
+            tuple(params),
+        )
+        return [_normalize_personality_trait(row) for row in cursor.fetchall()]
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def add_user_personality_trait(
+    user_id: int,
+    trait: str = None,
+    *,
+    name: str = None,
+    description: str = "",
+    category: str = "communication",
+    strength: int = 50,
+    created_by: str = "user",
+) -> dict | None:
+    """Create a user-owned trait.  This path can never create an AI trait."""
+    from core.trait_authority import require_trait_operation
+    require_trait_operation("user", "user", "create")
+    name = str(name or trait or "").strip()
+    if not name:
+        return None
+    strength = max(0, min(100, int(strength)))
     db_connection = get_db()
     cursor = db_connection.cursor(dictionary=True)
     try:
         cursor.execute(
             """
-            SELECT id, trait, created_at
-            FROM user_personality_traits
-            WHERE user_id = %s
-            ORDER BY created_at, id
+            INSERT IGNORE INTO user_personality_traits
+                (user_id, trait, name, description, category, strength, owner, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, 'user', %s)
             """,
-            (user_id,)
+            (user_id, name, name, description, category, strength, created_by),
+        )
+        if cursor.rowcount:
+            _record_trait_history(
+                cursor, user_id, cursor.lastrowid, name, "created",
+                "User-created communication preference.", created_by,
+            )
+        db_connection.commit()
+        cursor.execute(
+            """
+            SELECT id, trait, name, description, category, strength, owner,
+                   created_by, reason_created, influence_summary, active,
+                   created_at, updated_at
+            FROM user_personality_traits
+            WHERE user_id = %s AND trait = %s AND owner = 'user'
+            """,
+            (user_id, name),
+        )
+        return _normalize_personality_trait(cursor.fetchone())
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def update_user_personality_trait(user_id: int, trait_id: int, changes: dict) -> dict | None:
+    """Edit a user-owned trait; AI-owned rows are excluded by the query."""
+    from core.trait_authority import require_trait_operation
+    require_trait_operation("user", "user", "edit")
+    allowed = {"name", "description", "category", "strength", "active"}
+    updates = {key: value for key, value in (changes or {}).items() if key in allowed}
+    if not updates:
+        return None
+    if "strength" in updates:
+        updates["strength"] = max(0, min(100, int(updates["strength"])))
+    if "name" in updates:
+        updates["name"] = str(updates["name"]).strip()
+        if not updates["name"]:
+            return None
+        updates["trait"] = updates["name"]
+
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        assignments = ", ".join(f"{key} = %s" for key in updates)
+        cursor.execute(
+            f"UPDATE user_personality_traits SET {assignments} "
+            "WHERE id = %s AND user_id = %s AND owner = 'user'",
+            (*updates.values(), trait_id, user_id),
+        )
+        if not cursor.rowcount:
+            return None
+        cursor.execute(
+            "SELECT name FROM user_personality_traits WHERE id = %s AND user_id = %s",
+            (trait_id, user_id),
+        )
+        name = cursor.fetchone()["name"]
+        _record_trait_history(cursor, user_id, trait_id, name, "updated", "User edit.", "user")
+        db_connection.commit()
+        return get_personality_trait(user_id, trait_id, connection=db_connection, cursor=cursor)
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def get_personality_trait(user_id: int, trait_id: int, connection=None, cursor=None):
+    owns_resources = connection is None or cursor is None
+    db_connection = connection or get_db()
+    db_cursor = cursor or db_connection.cursor(dictionary=True)
+    try:
+        db_cursor.execute(
+            """
+            SELECT id, trait, name, description, category, strength, owner,
+                   created_by, reason_created, influence_summary, active,
+                   created_at, updated_at
+            FROM user_personality_traits WHERE id = %s AND user_id = %s
+            """,
+            (trait_id, user_id),
+        )
+        return _normalize_personality_trait(db_cursor.fetchone())
+    finally:
+        if owns_resources:
+            db_cursor.close()
+            db_connection.close()
+
+
+def create_aetheraeon_personality_trait(
+    user_id: int,
+    *,
+    name: str,
+    description: str,
+    category: str,
+    strength: int,
+    reason_created: str,
+    influence_summary: str,
+) -> dict | None:
+    """Internal AI-only creation path with mandatory transparency fields."""
+    from core.trait_authority import require_trait_operation
+    require_trait_operation("aetheraeon", "aetheraeon", "create")
+    name = str(name or "").strip()
+    reason_created = str(reason_created or "").strip()
+    influence_summary = str(influence_summary or "").strip()
+    if not name or not reason_created or not influence_summary:
+        return None
+    strength = max(0, min(100, int(strength)))
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            INSERT IGNORE INTO user_personality_traits
+                (user_id, trait, name, description, category, strength, owner,
+                 created_by, reason_created, influence_summary)
+            VALUES (%s, %s, %s, %s, %s, %s, 'aetheraeon', 'aetheraeon', %s, %s)
+            """,
+            (user_id, name, name, description, category, strength,
+             reason_created, influence_summary),
+        )
+        trait_id = cursor.lastrowid
+        if cursor.rowcount:
+            _record_trait_history(
+                cursor, user_id, trait_id, name, "created",
+                reason_created, "aetheraeon",
+            )
+        db_connection.commit()
+        cursor.execute(
+            "SELECT id FROM user_personality_traits "
+            "WHERE user_id = %s AND trait = %s AND owner = 'aetheraeon'",
+            (user_id, name),
+        )
+        row = cursor.fetchone()
+        return get_personality_trait(user_id, row["id"], connection=db_connection, cursor=cursor)
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def update_aetheraeon_personality_trait(user_id: int, trait_id: int, changes: dict) -> dict | None:
+    """Internal AI path; it cannot alter a user-owned trait."""
+    from core.trait_authority import require_trait_operation
+    require_trait_operation("aetheraeon", "aetheraeon", "edit")
+    allowed = {"description", "category", "strength", "reason_created", "influence_summary", "active"}
+    updates = {key: value for key, value in (changes or {}).items() if key in allowed}
+    if not updates:
+        return None
+    if "strength" in updates:
+        updates["strength"] = max(0, min(100, int(updates["strength"])))
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        assignments = ", ".join(f"{key} = %s" for key in updates)
+        cursor.execute(
+            f"UPDATE user_personality_traits SET {assignments} "
+            "WHERE id = %s AND user_id = %s AND owner = 'aetheraeon'",
+            (*updates.values(), trait_id, user_id),
+        )
+        if not cursor.rowcount:
+            return None
+        cursor.execute(
+            "SELECT name FROM user_personality_traits WHERE id = %s AND user_id = %s",
+            (trait_id, user_id),
+        )
+        name = cursor.fetchone()["name"]
+        _record_trait_history(
+            cursor, user_id, trait_id, name, "updated",
+            str(changes.get("reason_created") or "Aetheraeon trait adjustment."),
+            "aetheraeon",
+        )
+        db_connection.commit()
+        return get_personality_trait(user_id, trait_id, connection=db_connection, cursor=cursor)
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def add_personality_trait_feedback(user_id: int, trait_id: int, correction: str) -> dict | None:
+    """Attach user correction to an AI trait without editing that trait."""
+    from core.trait_authority import require_trait_operation
+    require_trait_operation("user", "aetheraeon", "correct")
+    correction = str(correction or "").strip()
+    if not correction:
+        return None
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT name FROM user_personality_traits "
+            "WHERE id = %s AND user_id = %s AND owner = 'aetheraeon' AND active = 1",
+            (trait_id, user_id),
+        )
+        trait = cursor.fetchone()
+        if not trait:
+            return None
+        cursor.execute(
+            "INSERT INTO personality_trait_feedback (user_id, trait_id, correction) VALUES (%s, %s, %s)",
+            (user_id, trait_id, correction),
+        )
+        feedback_id = cursor.lastrowid
+        _record_trait_history(
+            cursor, user_id, trait_id, trait["name"], "corrected",
+            correction, "user_feedback",
+        )
+        db_connection.commit()
+        cursor.execute(
+            "SELECT id, trait_id, correction, created_at FROM personality_trait_feedback WHERE id = %s",
+            (feedback_id,),
+        )
+        return cursor.fetchone()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def get_personality_trait_feedback(user_id: int) -> list[dict]:
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT f.id, f.trait_id, t.name AS related_trait, f.correction, f.created_at
+            FROM personality_trait_feedback f
+            JOIN user_personality_traits t ON t.id = f.trait_id AND t.user_id = f.user_id
+            WHERE f.user_id = %s AND t.owner = 'aetheraeon' AND t.active = 1
+            ORDER BY f.created_at, f.id
+            """,
+            (user_id,),
         )
         return cursor.fetchall()
     finally:
@@ -2216,25 +3173,236 @@ def get_user_personality_traits(user_id: int) -> list[dict]:
         db_connection.close()
 
 
-def add_user_personality_trait(user_id: int, trait: str) -> dict | None:
-    """Add a unique trait for one user and return its stored record."""
+def get_personality_trait_history(user_id: int) -> list[dict]:
     db_connection = get_db()
     cursor = db_connection.cursor(dictionary=True)
     try:
         cursor.execute(
-            "INSERT IGNORE INTO user_personality_traits (user_id, trait) VALUES (%s, %s)",
-            (user_id, trait)
+            """
+            SELECT h.id, h.trait_id, h.trait_name, h.action, h.reason,
+                   h.source, h.created_at,
+                   CASE
+                       WHEN h.source IN (
+                           'aetheraeon', 'aetheraeon_evolution',
+                           'user_removed_aetheraeon'
+                       )
+                           THEN 'aetheraeon'
+                       WHEN h.source = 'user_feedback'
+                           THEN COALESCE(t.owner, 'aetheraeon')
+                       ELSE COALESCE(t.owner, 'user')
+                   END AS owner
+            FROM personality_trait_history h
+            LEFT JOIN user_personality_traits t
+              ON t.id = h.trait_id AND t.user_id = h.user_id
+            WHERE h.user_id = %s
+            ORDER BY h.created_at DESC, h.id DESC
+            """,
+            (user_id,),
         )
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def _normalize_trait_candidate(record: dict | None) -> dict | None:
+    if not record:
+        return record
+    normalized = dict(record)
+    events = normalized.get("influencing_events")
+    if isinstance(events, str):
+        try:
+            events = json.loads(events)
+        except (TypeError, ValueError):
+            events = []
+    normalized["influencing_events"] = events if isinstance(events, list) else []
+    normalized["confidence_score"] = int(normalized.get("confidence_score") or 0)
+    normalized["evidence_count"] = int(normalized.get("evidence_count") or 0)
+    return normalized
+
+
+def get_personality_trait_candidates(
+    user_id: int,
+    include_promoted: bool = False,
+) -> list[dict]:
+    """Return candidates scoped to one user; candidates are not memories."""
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        status_filter = "" if include_promoted else "AND c.status = 'observing'"
+        cursor.execute(
+            f"""
+            SELECT c.id, c.name, c.description, c.category,
+                   c.confidence_score, c.evidence_count,
+                   c.first_detected_at, c.last_detected_at,
+                   c.reason_detected, c.influencing_events, c.status,
+                   c.promoted_trait_id, c.promoted_at,
+                   t.name AS promoted_trait_name
+            FROM personality_trait_candidates c
+            LEFT JOIN user_personality_traits t
+              ON t.id = c.promoted_trait_id AND t.user_id = c.user_id
+            WHERE c.user_id = %s {status_filter}
+            ORDER BY c.confidence_score DESC, c.last_detected_at DESC, c.id DESC
+            """,
+            (user_id,),
+        )
+        return [_normalize_trait_candidate(row) for row in cursor.fetchall()]
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def record_personality_trait_candidate_evidence(
+    *,
+    user_id: int,
+    conversation_id: str,
+    event_key: str,
+    signal: dict,
+) -> dict | None:
+    """Record one distinct observation and promote only at the threshold."""
+    from core.trait_authority import require_trait_operation
+    from core.trait_evolution import next_candidate_state
+
+    require_trait_operation("aetheraeon", "aetheraeon", "create")
+    candidate_name = str(signal.get("candidate_name") or "").strip()
+    if not candidate_name or not event_key:
+        return None
+
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT * FROM personality_trait_candidates "
+            "WHERE user_id = %s AND name = %s FOR UPDATE",
+            (user_id, candidate_name),
+        )
+        existing = cursor.fetchone()
+        existing_normalized = _normalize_trait_candidate(existing) or {}
+        events = list(existing_normalized.get("influencing_events") or [])
+        if any(item.get("event_key") == event_key for item in events if isinstance(item, dict)):
+            return existing_normalized
+
+        events.append({
+            "event_key": event_key,
+            "conversation_id": str(conversation_id),
+            "summary": str(signal.get("event_summary") or "Explicit style preference."),
+        })
+        events = events[-20:]
+        state = next_candidate_state(existing_normalized)
+        serialized_events = json.dumps(events, ensure_ascii=False, separators=(",", ":"))
+
+        if existing:
+            cursor.execute(
+                """
+                UPDATE personality_trait_candidates
+                SET confidence_score = %s, evidence_count = %s,
+                    last_detected_at = CURRENT_TIMESTAMP,
+                    reason_detected = %s, influencing_events = %s,
+                    status = %s
+                WHERE id = %s AND user_id = %s
+                """,
+                (
+                    state["confidence_score"], state["evidence_count"],
+                    signal.get("reason", ""), serialized_events,
+                    state["status"], existing["id"], user_id,
+                ),
+            )
+            candidate_id = existing["id"]
+        else:
+            cursor.execute(
+                """
+                INSERT INTO personality_trait_candidates
+                    (user_id, name, description, category, confidence_score,
+                     evidence_count, reason_detected, influencing_events, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    user_id, candidate_name, signal.get("candidate_description", ""),
+                    signal.get("category", "communication"),
+                    state["confidence_score"], state["evidence_count"],
+                    signal.get("reason", ""), serialized_events, state["status"],
+                ),
+            )
+            candidate_id = cursor.lastrowid
+
+        if state["should_promote"]:
+            promoted_name = str(signal.get("promoted_name") or candidate_name).strip()
+            strength = max(0, min(100, int(signal.get("promoted_strength") or 70)))
+            influence_summary = (
+                f"Promoted from {state['evidence_count']} distinct interaction signals; "
+                f"candidate confidence {state['confidence_score']}%."
+            )
+            cursor.execute(
+                """
+                INSERT IGNORE INTO user_personality_traits
+                    (user_id, trait, name, description, category, strength,
+                     owner, created_by, reason_created, influence_summary)
+                VALUES (%s, %s, %s, %s, %s, %s,
+                        'aetheraeon', 'aetheraeon', %s, %s)
+                """,
+                (
+                    user_id, promoted_name, promoted_name,
+                    signal.get("promoted_description", ""),
+                    signal.get("category", "communication"), strength,
+                    signal.get("reason", ""), influence_summary,
+                ),
+            )
+            created = cursor.rowcount > 0
+            cursor.execute(
+                "SELECT id FROM user_personality_traits "
+                "WHERE user_id = %s AND trait = %s AND owner = 'aetheraeon'",
+                (user_id, promoted_name),
+            )
+            promoted_trait_id = cursor.fetchone()["id"]
+            if created:
+                _record_trait_history(
+                    cursor, user_id, promoted_trait_id, promoted_name, "created",
+                    str(signal.get("reason") or "Repeated interaction preference."),
+                    "aetheraeon_evolution",
+                )
+            cursor.execute(
+                """
+                UPDATE personality_trait_candidates
+                SET status = 'promoted', promoted_trait_id = %s,
+                    promoted_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND user_id = %s
+                """,
+                (promoted_trait_id, candidate_id, user_id),
+            )
+        elif existing and existing.get("status") == "promoted" and existing.get("promoted_trait_id"):
+            cursor.execute(
+                """
+                UPDATE user_personality_traits
+                SET strength = LEAST(100, strength + 5),
+                    influence_summary = %s
+                WHERE id = %s AND user_id = %s AND owner = 'aetheraeon'
+                """,
+                (
+                    f"Reinforced by {state['evidence_count']} distinct interaction signals.",
+                    existing["promoted_trait_id"], user_id,
+                ),
+            )
+            if cursor.rowcount:
+                cursor.execute(
+                    "SELECT name FROM user_personality_traits WHERE id = %s AND user_id = %s",
+                    (existing["promoted_trait_id"], user_id),
+                )
+                promoted = cursor.fetchone()
+                _record_trait_history(
+                    cursor, user_id, existing["promoted_trait_id"], promoted["name"],
+                    "evolved", "Additional preference evidence.",
+                    "aetheraeon_evolution",
+                )
+
         db_connection.commit()
         cursor.execute(
-            """
-            SELECT id, trait, created_at
-            FROM user_personality_traits
-            WHERE user_id = %s AND trait = %s
-            """,
-            (user_id, trait)
+            "SELECT * FROM personality_trait_candidates WHERE id = %s AND user_id = %s",
+            (candidate_id, user_id),
         )
-        return cursor.fetchone()
+        return _normalize_trait_candidate(cursor.fetchone())
+    except Exception:
+        db_connection.rollback()
+        raise
     finally:
         cursor.close()
         db_connection.close()
@@ -2245,10 +3413,53 @@ def delete_user_personality_trait(
     trait_id: int = None,
     trait: str = None
 ) -> bool:
-    """Remove a trait scoped by user_id and either id or trait text."""
+    """Remove a user- or AI-owned trait, as both owners permit user removal."""
     db_connection = get_db()
-    cursor = db_connection.cursor()
+    cursor = db_connection.cursor(dictionary=True)
     try:
+        if trait_id is not None:
+            cursor.execute(
+                "SELECT id, name, owner FROM user_personality_traits WHERE id = %s AND user_id = %s",
+                (trait_id, user_id),
+            )
+        elif trait is not None:
+            cursor.execute(
+                "SELECT id, name, owner FROM user_personality_traits "
+                "WHERE user_id = %s AND trait = %s AND owner = 'user'",
+                (user_id, trait),
+            )
+        else:
+            return False
+        record = cursor.fetchone()
+        if not record:
+            return False
+        from core.trait_authority import require_trait_operation
+        require_trait_operation("user", record["owner"], "delete")
+        if record["owner"] == "aetheraeon":
+            cursor.execute(
+                "SELECT id FROM personality_trait_candidates "
+                "WHERE user_id = %s AND promoted_trait_id = %s",
+                (user_id, record["id"]),
+            )
+            promoted_candidates = cursor.fetchall()
+            if promoted_candidates:
+                cursor.execute(
+                    "DELETE FROM personality_trait_candidates "
+                    "WHERE user_id = %s AND promoted_trait_id = %s",
+                    (user_id, record["id"]),
+                )
+                cursor.execute(
+                    "DELETE FROM personality_trait_history "
+                    "WHERE user_id = %s AND trait_id = %s "
+                    "AND source = 'aetheraeon_evolution'",
+                    (user_id, record["id"]),
+                )
+        _record_trait_history(
+            cursor, user_id, record["id"], record["name"], "removed",
+            "Removed by user.",
+            "user_removed_aetheraeon"
+            if record["owner"] == "aetheraeon" else "user",
+        )
         if trait_id is not None:
             cursor.execute(
                 "DELETE FROM user_personality_traits WHERE id = %s AND user_id = %s",
@@ -2256,11 +3467,41 @@ def delete_user_personality_trait(
             )
         elif trait is not None:
             cursor.execute(
-                "DELETE FROM user_personality_traits WHERE user_id = %s AND trait = %s",
+                "DELETE FROM user_personality_traits "
+                "WHERE user_id = %s AND trait = %s AND owner = 'user'",
                 (user_id, trait)
             )
-        else:
+        db_connection.commit()
+        return cursor.rowcount > 0
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def delete_aetheraeon_personality_trait(user_id: int, trait_id: int) -> bool:
+    """Internal AI removal path; user-owned traits are query-inaccessible."""
+    from core.trait_authority import require_trait_operation
+    require_trait_operation("aetheraeon", "aetheraeon", "delete")
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            "SELECT id, name FROM user_personality_traits "
+            "WHERE id = %s AND user_id = %s AND owner = 'aetheraeon'",
+            (trait_id, user_id),
+        )
+        record = cursor.fetchone()
+        if not record:
             return False
+        _record_trait_history(
+            cursor, user_id, trait_id, record["name"], "removed",
+            "Removed by Aetheraeon evolution.", "aetheraeon",
+        )
+        cursor.execute(
+            "DELETE FROM user_personality_traits "
+            "WHERE id = %s AND user_id = %s AND owner = 'aetheraeon'",
+            (trait_id, user_id),
+        )
         db_connection.commit()
         return cursor.rowcount > 0
     finally:
@@ -2488,6 +3729,21 @@ def get_conversations(user_id: int) -> list[dict]:
         # 4. RESOURCE CLEANUP
         # ─────────────────────────────────────────
 
+        cursor.close()
+        db_connection.close()
+
+
+def conversation_belongs_to_user(conv_uuid: str, user_id: int) -> bool:
+    """Return whether a conversation UUID belongs to the supplied user."""
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.execute(
+            "SELECT 1 FROM conversations WHERE conversation_id = %s AND user_id = %s",
+            (conv_uuid, user_id),
+        )
+        return cursor.fetchone() is not None
+    finally:
         cursor.close()
         db_connection.close()
 
@@ -2865,6 +4121,13 @@ def _save_message(
 
     try:
 
+        cursor.execute(
+            "SELECT 1 FROM conversations WHERE id = %s AND user_id = %s",
+            (internal_conversation_id, user_id),
+        )
+        if cursor.fetchone() is None:
+            return
+
         # ─────────────────────────────────────────
         # 5. MESSAGE INSERTION OPERATION
         # ─────────────────────────────────────────
@@ -2971,7 +4234,8 @@ def save_message_ai(
     conv_uuid: str,
     user_id: int,
     content: str,
-    tool_used: str = None
+    tool_used: str = None,
+    metadata=None,
 ) -> None:
     """
     ============================================================
@@ -3011,14 +4275,16 @@ def save_message_ai(
         user_id,
         "ai",
         content,
-        tool_used
+        tool_used,
+        json.dumps(metadata, separators=(",", ":"), default=str)
+        if isinstance(metadata, dict) else metadata,
     )
     
 # ============================================================
 # MESSAGE SYSTEM — GET MESSAGES (CONVERSATION READ ENGINE)
 # ============================================================
 
-def get_messages(conv_uuid: str) -> list[dict]:
+def get_messages(conv_uuid: str, user_id: int = None) -> list[dict]:
     """
     ============================================================
     MESSAGE RETRIEVAL SYSTEM (CHAT HISTORY RECONSTRUCTION LAYER)
@@ -3069,18 +4335,23 @@ def get_messages(conv_uuid: str) -> list[dict]:
         # - created_at (timestamp)
         # ─────────────────────────────────────────
 
+        ownership_clause = " AND c.user_id = %s" if user_id is not None else ""
+        parameters = (internal_conversation_id, user_id) if user_id is not None else (internal_conversation_id,)
         cursor.execute(
-            """
+            f"""
             SELECT
-                role,
-                content,
-                tool_used,
-                created_at
-            FROM messages
-            WHERE conversation_id = %s
-            ORDER BY created_at ASC, id ASC
+                m.id AS message_id,
+                m.role,
+                m.content,
+                m.tool_used,
+                m.metadata,
+                m.created_at
+            FROM messages m
+            JOIN conversations c ON c.id = m.conversation_id
+            WHERE m.conversation_id = %s{ownership_clause}
+            ORDER BY m.created_at ASC, m.id ASC
             """,
-            (internal_conversation_id,)
+            parameters
         )
 
         message_rows = cursor.fetchall()
@@ -3093,6 +4364,17 @@ def get_messages(conv_uuid: str) -> list[dict]:
         # ─────────────────────────────────────────
 
         for message in message_rows:
+
+            raw_metadata = message.pop("metadata", None)
+            if raw_metadata:
+                try:
+                    parsed_metadata = json.loads(raw_metadata)
+                    message["processing"] = parsed_metadata.get("processing")
+                    response_metadata = parsed_metadata.get("response_metadata")
+                    if isinstance(response_metadata, dict):
+                        message["response_metadata"] = response_metadata
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    message["processing"] = None
 
             timestamp = message.get("created_at")
 
@@ -3115,6 +4397,145 @@ def get_messages(conv_uuid: str) -> list[dict]:
 # MESSAGE SYSTEM — SEARCH MESSAGES (FULL-TEXT MEMORY ENGINE)
 # ============================================================
 
+CHAT_SEARCH_PAGE_SIZE = 100
+CHAT_SEARCH_SESSION_MAX_RESULTS = 500
+
+
+class ChatSearchCursorError(ValueError):
+    """Raised when a chat-history search cursor is malformed or exhausted."""
+
+
+def _escape_like_literal(query: str) -> str:
+    """Escape SQL LIKE metacharacters so chat search remains literal."""
+
+    return query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _encode_chat_search_cursor(created_at, message_id: int, returned_count: int) -> str:
+    """Encode opaque pagination state; it is not an authorization token."""
+
+    payload = {
+        "created_at": str(created_at),
+        "message_id": int(message_id),
+        "returned_count": int(returned_count),
+    }
+    encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(encoded).decode("ascii").rstrip("=")
+
+
+def _decode_chat_search_cursor(cursor: str | None) -> tuple[str | None, int | None, int]:
+    """Validate one opaque cursor and return its stable ordering boundary."""
+
+    if cursor is None or not str(cursor).strip():
+        return None, None, 0
+    try:
+        encoded = str(cursor).strip()
+        padded = encoded + "=" * (-len(encoded) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")))
+        created_at = str(payload["created_at"]).strip()
+        message_id = int(payload["message_id"])
+        returned_count = int(payload["returned_count"])
+    except (KeyError, TypeError, ValueError, UnicodeDecodeError, binascii.Error, json.JSONDecodeError) as exc:
+        raise ChatSearchCursorError("invalid chat search cursor") from exc
+    if not created_at or len(created_at) > 64 or message_id < 1 or returned_count < 0:
+        raise ChatSearchCursorError("invalid chat search cursor")
+    if returned_count >= CHAT_SEARCH_SESSION_MAX_RESULTS:
+        raise ChatSearchCursorError("chat search result cap reached")
+    return created_at, message_id, returned_count
+
+
+def search_messages_page(
+    user_id: int,
+    query: str,
+    *,
+    cursor: str | None = None,
+    page_size: int = CHAT_SEARCH_PAGE_SIZE,
+) -> dict:
+    """Return a cursor-paginated, owner-scoped page of literal chat matches.
+
+    Chat history remains MariaDB-backed and independent from ChromaDB semantic
+    memory search. The cursor count is a user-experience cap only; every query
+    still scopes results to the authenticated owner's conversations.
+    """
+
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("chat search query is required")
+    if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
+        raise ValueError("page_size must be a positive integer")
+
+    cursor_created_at, cursor_message_id, returned_count = _decode_chat_search_cursor(cursor)
+    remaining = CHAT_SEARCH_SESSION_MAX_RESULTS - returned_count
+    effective_page_size = min(page_size, CHAT_SEARCH_PAGE_SIZE, remaining)
+    if effective_page_size < 1:
+        raise ChatSearchCursorError("chat search result cap reached")
+
+    db_connection = get_db()
+    cursor_handle = db_connection.cursor(dictionary=True)
+    search_pattern = f"%{_escape_like_literal(query.strip())}%"
+    where_cursor = ""
+    parameters: list = [user_id, search_pattern]
+    if cursor_created_at is not None and cursor_message_id is not None:
+        where_cursor = """
+              AND (m.created_at < %s OR (m.created_at = %s AND m.id < %s))
+        """
+        parameters.extend((cursor_created_at, cursor_created_at, cursor_message_id))
+    parameters.append(effective_page_size + 1)
+
+    try:
+        cursor_handle.execute(
+            f"""
+            SELECT
+                m.id AS message_id,
+                m.role,
+                m.content,
+                m.tool_used,
+                m.created_at,
+                c.conversation_id,
+                c.name AS conversation_name
+            FROM messages m
+            INNER JOIN conversations c
+                ON c.id = m.conversation_id
+            WHERE c.user_id = %s
+              AND m.content LIKE %s ESCAPE '\\\\'
+            {where_cursor}
+            ORDER BY m.created_at DESC, m.id DESC
+            LIMIT %s
+            """,
+            tuple(parameters),
+        )
+        fetched_results = cursor_handle.fetchall()
+        has_more = len(fetched_results) > effective_page_size
+        search_results = fetched_results[:effective_page_size]
+        next_cursor = None
+
+        if has_more and search_results:
+            last_result = search_results[-1]
+            next_cursor = _encode_chat_search_cursor(
+                last_result.get("created_at"),
+                last_result.get("message_id"),
+                returned_count + len(search_results),
+            )
+        if returned_count + len(search_results) >= CHAT_SEARCH_SESSION_MAX_RESULTS:
+            has_more = False
+            next_cursor = None
+
+        for result in search_results:
+            timestamp = result.get("created_at")
+            if timestamp:
+                result["created_at"] = str(timestamp)
+
+        return {
+            "results": search_results,
+            "count": len(search_results),
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+        }
+    finally:
+        cursor_handle.close()
+        db_connection.close()
+
+
+# Legacy list-returning helper retained for non-WebUI callers.
 def search_messages(user_id: int, query: str) -> list[dict]:
     """
     ============================================================
@@ -3794,3 +5215,146 @@ def _resolve_entry_by_ref(reference_value, memory_entries):
     # --------------------------------------------------------
 
     return matching_entries[0]    
+
+
+# ============================================================
+# SEMANTIC MEMORY COORDINATOR — USAGE ROTATION PERSISTENCE
+# ============================================================
+
+def get_recent_semantic_conversation_candidates(user_id, *, limit=12):
+    """Return a bounded recent-message pool for greeting semantic selection.
+
+    This is not a transcript export: the query is owner scoped, capped, and
+    consumed only by the coordinator's relevance/compression boundary.
+    """
+
+    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id < 1:
+        raise ValueError("user_id must be a positive integer")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
+    effective_limit = min(limit, 12)
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    try:
+        cursor.execute(
+            """
+            SELECT m.id AS message_id, m.role, m.content, m.created_at,
+                   c.conversation_id, c.name AS conversation_name
+            FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id
+            WHERE c.user_id = %s
+              AND m.user_id = %s
+              AND m.role IN ('user', 'assistant')
+            ORDER BY m.created_at DESC, m.id DESC
+            LIMIT %s
+            """,
+            (user_id, user_id, effective_limit),
+        )
+        return [dict(row, user_id=user_id) for row in cursor.fetchall()]
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+SEMANTIC_MEMORY_USAGE_SOURCES = {"chromadb", "conversation_history"}
+
+
+def get_semantic_memory_usage(user_id, source, source_item_ids):
+    """Return content-free selection usage for one owner and one source.
+
+    Phase 5.1A does not call this from production chat or greeting retrieval.
+    The owner and source constraints are deliberately mandatory so this helper
+    cannot become an unscoped memory enumeration path.
+    """
+
+    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id < 1:
+        raise ValueError("user_id must be a positive integer")
+    if source not in SEMANTIC_MEMORY_USAGE_SOURCES:
+        raise ValueError("unsupported semantic memory usage source")
+    normalized_ids = tuple(dict.fromkeys(
+        str(item_id).strip() for item_id in source_item_ids if str(item_id).strip()
+    ))
+    if not normalized_ids:
+        return {}
+
+    db_connection = get_db()
+    cursor = db_connection.cursor(dictionary=True)
+    placeholders = ", ".join(["%s"] * len(normalized_ids))
+    try:
+        cursor.execute(
+            f"""
+            SELECT source_item_id, memory_type, last_selected_at,
+                   selection_count, rotation_cycle
+            FROM semantic_memory_usage
+            WHERE user_id = %s
+              AND source = %s
+              AND source_item_id IN ({placeholders})
+            """,
+            (user_id, source, *normalized_ids),
+        )
+        return {
+            str(row["source_item_id"]): {
+                **row,
+                "last_selected_at": (
+                    str(row["last_selected_at"])
+                    if row.get("last_selected_at") is not None else None
+                ),
+            }
+            for row in cursor.fetchall()
+        }
+    finally:
+        cursor.close()
+        db_connection.close()
+
+
+def record_semantic_memory_usage(user_id, selections):
+    """Atomically upsert content-free selection counters for one owner."""
+
+    if isinstance(user_id, bool) or not isinstance(user_id, int) or user_id < 1:
+        raise ValueError("user_id must be a positive integer")
+    normalized = []
+    for selection in selections:
+        source = str(selection.get("source") or "").strip()
+        source_item_id = str(selection.get("source_item_id") or "").strip()
+        memory_type = str(selection.get("memory_type") or "unknown").strip()[:64]
+        rotation_cycle = selection.get("rotation_cycle", 1)
+        if source not in SEMANTIC_MEMORY_USAGE_SOURCES:
+            raise ValueError("unsupported semantic memory usage source")
+        if not source_item_id or len(source_item_id) > 191:
+            raise ValueError("source_item_id must contain 1-191 characters")
+        if (
+            isinstance(rotation_cycle, bool)
+            or not isinstance(rotation_cycle, int)
+            or rotation_cycle < 1
+        ):
+            raise ValueError("rotation_cycle must be a positive integer")
+        normalized.append((source, source_item_id, memory_type, rotation_cycle))
+    if not normalized:
+        return
+
+    db_connection = get_db()
+    cursor = db_connection.cursor()
+    try:
+        cursor.executemany(
+            """
+            INSERT INTO semantic_memory_usage (
+                user_id, source, source_item_id, memory_type,
+                last_selected_at, selection_count, rotation_cycle
+            )
+            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, 1, %s)
+            ON DUPLICATE KEY UPDATE
+                memory_type = VALUES(memory_type),
+                last_selected_at = CURRENT_TIMESTAMP,
+                selection_count = selection_count + 1,
+                rotation_cycle = VALUES(rotation_cycle),
+                updated_at = CURRENT_TIMESTAMP
+            """,
+            [(user_id, *selection) for selection in normalized],
+        )
+        db_connection.commit()
+    except Exception:
+        db_connection.rollback()
+        raise
+    finally:
+        cursor.close()
+        db_connection.close()

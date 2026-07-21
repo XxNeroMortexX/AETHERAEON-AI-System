@@ -1,93 +1,20 @@
 """
-========================================================
-AETHERAEON — SYSTEM UTILITIES LAYER
-========================================================
+Aetheraeon AI - System Utilities
 
-FILE PURPOSE:
-This file contains general-purpose utility functions used
-across the AI system.
+Purpose:
+Provides small reusable helpers shared across the current Aetheraeon runtime.
 
-It acts as a shared helper layer for:
-- formatting utilities
-- system-level helper functions
-- reusable logic that does NOT belong to a specific module
-- lightweight transformations used across architecture layers
+Architecture Layer:
+Utility and Support Layer.
 
-========================================================
-SYSTEM ROLE:
-"Shared Utility Layer"
+Responsibilities:
+- Perform generic formatting, normalization, and lightweight data transformations.
+- Reduce duplicated helper logic across core modules.
+- Return predictable values to calling components.
 
-This file provides common building blocks used by multiple
-system components without enforcing business logic.
-
-It is intentionally kept generic and reusable.
-
-========================================================
-RESPONSIBILITIES:
-(system_utils.py)
-
-- General helper functions used across modules
-- Lightweight string/data formatting utilities
-- Safe transformation helpers
-- Reusable system-level operations
-- Support functions for logging, parsing, or formatting
-- Cross-module convenience functions
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(system_utils.py)
-
-This file MUST NOT:
-- Contain AI reasoning logic (core_cognition handles this)
-- Execute tools or actions (tool_executor handles this)
-- Perform orchestration (ai_orchestrator handles this)
-- Access database directly (memory_database handles this)
-- Handle API routing or request flow (api_gateway handles this)
-
-It ONLY provides reusable helper functions.
-
-========================================================
-SYSTEM USAGE FLOW:
-(system_utils.py usage)
-
-Any Module
-    ↓
-system_utils.py (helper function call)
-    ↓
-Return processed/cleaned data
-    ↓
-Back to calling system layer
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-Used by:
-- ai_orchestrator.py
-- core_cognition.py
-- request_router.py
-- tool_executor.py
-- memory_context_builder.py
-- system_logger.py
-
-========================================================
-OUTPUT CONTRACT:
-(system_utils.py returns)
-
-- cleaned or formatted values
-- lightweight computed helpers
-- reusable transformed outputs
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Keep It Pure and Reusable"
-
-- No side effects
-- No orchestration logic
-- No execution responsibility
-- Only shared helper intelligence
-
-========================================================
+Boundaries:
+- Utilities do not own cognitive policy, routing, orchestration, storage, security decisions, or tool execution.
+- Module-specific business logic remains with the component that owns that responsibility.
 """
 
 

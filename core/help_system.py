@@ -1,126 +1,21 @@
 """
-========================================================
-AETHERAEON — HELP SYSTEM (Knowledge & Documentation Layer)
-========================================================
+Aetheraeon AI - Help System
 
-FILE PURPOSE:
-This file is responsible for generating dynamic help,
-documentation, and tool usage guidance for the AI system.
+Purpose:
+Builds dynamic command and capability documentation from registered metadata and supplied access context.
 
-It converts registered tools, metadata, and system
-capabilities into structured help output for both:
-- the AI model
-- the user interface
-- developer debugging tools
+Architecture Layer:
+Utility and Support Layer - system documentation.
 
-========================================================
-SYSTEM ROLE:
-"Knowledge + Documentation Layer" of the architecture.
+Responsibilities:
+- Format tool and command descriptions for users and internal consumers.
+- Produce consistent usage guidance from current registry metadata.
+- Support permission-aware callers without granting permissions itself.
 
-It does NOT execute tools.
-It does NOT make AI decisions.
-
-It ONLY explains system capabilities.
-
-========================================================
-RESPONSIBILITIES:
-(help_system.py)
-
-- Read tool registry metadata (tool_registry)
-- Generate dynamic help text / structured help output
-- Build usage examples for tools
-- Summarize system capabilities for AI context
-- Provide tool descriptions for model prompting
-- Support debugging and developer introspection
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(help_system.py)
-
-This file MUST NOT:
-- Execute tools or commands (tool_executor.py handles this)
-- Perform AI reasoning (ai_orchestrator.py handles this)
-- Access or modify memory database
-- Modify system state or configuration
-- Perform external API calls
-
-It ONLY formats and organizes help data.
-
-========================================================
-HELP SYSTEM FLOW:
-(help_system.py functions)
-
-Tool Registry Input
-    ↓
-load_tools_metadata()
-    ↓
-parse_tool_definitions()
-    ↓
-build_tool_descriptions()
-    ↓
-format_help_output()
-    ↓
-return structured help object
-
-========================================================
-SYSTEM WIDE FLOW:
-(full architecture integration)
-
-User / AI Request
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-tool_executor.py
-    ↓
-external_toolkit.py
-    ↓
-memory_database.py
-    ↓
-model_registry.py
-    ↓
-help_system.py (ONLY when help is requested)
-    ↓
-UI / Debug Output
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-help_system.py depends on:
-- tool_registry (source of all tool metadata)
-- tool_executor (for execution context reference only)
-- json_helpers.py (formatting structured help output)
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- build_help()
-- format_tool_help()
-- get_tool_descriptions()
-- generate_usage_examples()
-- summarize_system_tools()
-
-========================================================
-OUTPUT CONTRACT:
-(help_system.py returns)
-
-- help_text (string OR structured JSON)
-- tool_list (optional structured metadata)
-- examples (optional usage examples)
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Explain the system without controlling it"
-
-- Help System DESCRIBES
-- Orchestrator DECIDES
-- tool_executor EXECUTES
-- Registry DEFINES
-- UI DISPLAYS
-
-========================================================
+Boundaries:
+- Help output is descriptive and does not authorize or execute commands.
+- This module does not perform reasoning, memory operations, tool selection, or security enforcement.
+- It exposes capability summaries, never private chain-of-thought or hidden reasoning.
 """
 
 
@@ -209,7 +104,7 @@ from core.tool_registry import register_tool
 # - Output Contract
 # ============================================================
 
-def build_help(tool_registry: list) -> dict:
+def build_help(tool_registry: list, role: str = None) -> dict:
     """
     PURPOSE:
     Builds structured help documentation from the tool registry.
@@ -246,6 +141,9 @@ def build_help(tool_registry: list) -> dict:
 
         # Safely extract metadata (prevents crash if structure changes)
         meta = tool_entry.get("meta", {})
+
+        if role and role not in meta.get("roles", ["admin", "user"]):
+            continue
 
         # Normalize category (fallback to "general")
         category = meta.get("category") or "general"

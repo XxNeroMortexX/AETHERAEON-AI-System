@@ -1,80 +1,20 @@
 """
-# ============================================================
-# AETHERAEON — CONFIGURATION MANAGEMENT SYSTEM
-# ============================================================
-#
-# FILE PURPOSE:
-# This file manages all system configuration state,
-# including runtime settings, persistent config values,
-# and environment-driven behavior changes.
-#
-# ============================================================
-# SYSTEM ROLE:
-# "Configuration Control Layer" of the architecture.
-#
-# This file acts as the single source of truth for:
-# - system-wide settings
-# - runtime feature toggles
-# - persistent configuration state
-#
-# ============================================================
-# RESPONSIBILITIES:
-# (config_manager.py)
-#
-# - Load configuration from disk / environment
-# - Save updated configuration safely
-# - Provide structured access to config values
-# - Merge defaults with user overrides
-# - Validate configuration integrity
-# - Support live updates without restart (where possible)
-#
-# ============================================================
-# STRICT BOUNDARIES (DO NOT BREAK):
-# (config_manager.py)
-#
-# This file MUST NOT:
-# - Execute AI reasoning (ai_orchestrator.py handles that)
-# - Run external tools or commands (tool_executor.py handles that)
-# - Directly modify memory database (memory_database.py handles that)
-# - Perform system execution logic outside config scope
-#
-# It ONLY manages configuration state and validation.
-#
-# ============================================================
-# SYSTEM CONFIGURATION FLOW:
-# (config_manager.py lifecycle)
-#
-# Load Default Config
-#     ↓
-# Merge Environment Variables
-#     ↓
-# Apply User Overrides
-#     ↓
-# Validate Schema
-#     ↓
-# Provide Config to System Modules
-#     ↓
-# Save Updates (if changed)
-#
-# ============================================================
-# KEY DEPENDENCIES:
-#
-# config_manager.py interacts with:
-# - system_paths.py (config file locations)
-# - json_helpers.py (safe serialization)
-# - system_utils.py (validation utilities)
-#
-# ============================================================
-# DESIGN PHILOSOPHY:
-#
-# "Configuration is Control — Not Logic"
-#
-# - Config defines behavior
-# - It does NOT execute behavior
-# - It does NOT reason
-# - It only describes system state
-#
-# ============================================================
+Aetheraeon AI - Configuration Manager
+
+Purpose:
+Manages current runtime settings and their supported persistence lifecycle.
+
+Architecture Layer:
+Configuration Layer - configuration state management.
+
+Responsibilities:
+- Load, validate, merge, and save supported configuration state.
+- Provide normalized settings to existing runtime components.
+- Preserve established configuration paths and behavior.
+
+Boundaries:
+- Configuration state is not cognitive policy and does not authorize memory or tool operations.
+- This module does not perform reasoning, execute tools, enforce security, or bypass approved persistence interfaces.
 """
 
 # ============================================================
@@ -86,16 +26,6 @@
 
 import json          # JSON parsing for settings + structured config storage
 import os            # File system access for config persistence
-import re            # Pattern cleanup for model name normalization
-
-
-# ============================================================
-# EXTERNAL DEPENDENCIES (PIP INSTALLED PACKAGES)
-# ============================================================
-# Third-party libraries installed via pip.
-# ============================================================
-
-import requests      # HTTP requests (used for model/service validation if needed)
 
 
 # ============================================================
@@ -128,7 +58,7 @@ from core.system_paths import SETTINGS_FILE  # Centralized path management for c
 # Used to track schema evolution of config file.
 # ============================================================
 
-VERSION = "4.3"
+VERSION = "5.0.0"
 
 
 # ============================================================

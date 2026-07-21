@@ -1,106 +1,20 @@
 """
-========================================================
-AETHERAEON — CONFIG LOADER (SYSTEM CONFIGURATION LAYER)
-========================================================
+Aetheraeon AI - Configuration Loader
 
-FILE PURPOSE:
-This file is responsible for loading, validating,
-and providing system configuration values used across
-the entire AI architecture.
+Purpose:
+Loads and normalizes the configuration values used by the current Aetheraeon runtime.
 
-It acts as the central configuration access layer
-for both runtime and startup settings.
+Architecture Layer:
+Configuration Layer.
 
-========================================================
-SYSTEM ROLE:
-"Configuration Backbone" of the architecture.
+Responsibilities:
+- Read supported environment and configuration sources.
+- Apply established defaults and validate required values.
+- Provide consistent configuration data to calling modules.
 
-It does NOT process AI reasoning.
-It does NOT execute tools.
-It ONLY loads, validates, and serves configuration data.
-
-========================================================
-RESPONSIBILITIES:
-(config_loader.py)
-
-- Load configuration files (JSON / ENV / system config)
-- Provide centralized access to system settings
-- Validate configuration structure and defaults
-- Merge environment variables with file-based config
-- Provide safe configuration retrieval methods
-- Support runtime config updates (if enabled)
-- Normalize config formats for internal system use
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(config_loader.py)
-
-This file MUST NOT:
-- Perform AI reasoning or decision making
-- Execute tools or external actions
-- Modify memory database directly
-- Handle API routing or request logic
-- Contain business logic beyond configuration handling
-
-It ONLY manages configuration data.
-
-========================================================
-CONFIG LOADER FLOW:
-
-Startup / Runtime Request
-    ↓
-load_config_file()
-    ↓
-merge_environment_variables()
-    ↓
-validate_config_schema()
-    ↓
-apply_defaults()
-    ↓
-return normalized config object
-    ↓
-used by all system layers
-
-========================================================
-SYSTEM WIDE USAGE:
-
-config_loader.py is used by:
-- ai_orchestrator.py
-- request_router.py
-- tool_executor.py
-- external_toolkit.py
-- system_paths.py
-- memory_database.py
-
-========================================================
-KEY FUNCTIONS (THIS FILE):
-
-- load_config()
-- get_config()
-- get_setting()
-- reload_config()
-- validate_config()
-- merge_env_config()
-
-========================================================
-OUTPUT CONTRACT:
-
-This module returns:
-- configuration dictionary/object
-- validated runtime settings
-- environment-overridden values
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Single Source of Truth for Configuration"
-
-- Config is centralized
-- No duplicated settings across modules
-- Environment overrides always take priority
-- System must remain deterministic and reproducible
-
-========================================================
+Boundaries:
+- Configuration values influence supported behavior but do not execute actions or establish cognitive policy.
+- This module does not make routing, memory, permission, security, model, or tool decisions.
 """
 
 

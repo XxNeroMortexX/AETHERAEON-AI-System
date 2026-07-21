@@ -1,113 +1,21 @@
 """
-========================================================
-AETHERAEON — MEMORY CONTEXT BUILDER (INTELLIGENCE SUPPORT LAYER)
-========================================================
+Aetheraeon AI - Memory Context Builder
 
-FILE PURPOSE:
-This file is responsible for building structured memory
-context for the AI system before reasoning occurs.
+Purpose:
+Assembles selected conversation and memory information into structured context for the current request.
 
-It transforms raw stored memory into usable AI context
-for the orchestrator.
+Architecture Layer:
+Memory Intelligence Layer - retrieval-context assembly support.
 
-========================================================
-SYSTEM ROLE:
-"Memory Intelligence & Context Assembly Layer"
+Responsibilities:
+- Build context blocks from current conversation history and approved long-term recall results.
+- Normalize and organize the sources actually supplied to downstream cognition and generation.
+- Provide the integration point for planned Short-Term Scoped Memory retrieval.
 
-This file is NOT a database layer.
-This file is NOT a reasoning engine.
-
-It ONLY:
-- Retrieves memory data (via memory_database.py)
-- Filters and ranks relevant memory
-- Structures memory into AI-ready context blocks
-- Compresses long-term memory into usable summaries
-- Prepares context for ai_orchestrator.py
-
-========================================================
-RESPONSIBILITIES:
-(memory_context_builder.py)
-
-- Fetch relevant memory from memory_database.py
-- Retrieve short-term conversation context
-- Retrieve long-term semantic memory (ChromaDB)
-- Rank memory relevance based on query similarity
-- Filter noise / irrelevant memory entries
-- Compress memory into structured context blocks
-- Build unified context object for AI reasoning
-- Support multi-layer memory blending (short + long term)
-- Optimize token usage before LLM input
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(memory_context_builder.py)
-
-This file MUST NOT:
-
-- Perform AI reasoning (ai_orchestrator.py handles this)
-- Execute tools or actions (tool_executor.py handles this)
-- Call LLM directly (llm_interface.py handles this)
-- Modify database schema (memory_database.py handles this)
-- Handle HTTP requests (api_gateway.py handles this)
-- Perform routing decisions (request_router.py handles this)
-
-It ONLY PREPARES MEMORY CONTEXT.
-
-========================================================
-SYSTEM WIDE MEMORY FLOW:
-
-User Input
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-memory_context_builder.py   ← THIS FILE
-    ↓
-memory_database.py (data fetch)
-    ↓
-ChromaDB (semantic recall)
-    ↓
-Context Assembly Engine
-    ↓
-Structured Context Output
-    ↓
-ai_orchestrator.py
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- build_conversation_context()
-- build_short_term_memory()
-- build_long_term_memory()
-- retrieve_relevant_memory()
-- rank_memory_by_relevance()
-- filter_memory_noise()
-- compress_memory_context()
-- merge_memory_layers()
-
-========================================================
-OUTPUT CONTRACT:
-
-This file returns:
-
-- structured_memory_context (dict)
-- short_term_context (list)
-- long_term_context (list)
-- relevance_scores (optional debug data)
-
-This output is ALWAYS consumed by:
-→ ai_orchestrator.py
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Memory is Not Storage — Memory is Context"
-
-This layer transforms raw data into intelligence-ready
-structure for the AI reasoning engine.
-
-========================================================
+Boundaries:
+- This module does not authorize storage, classify candidate memories, promote candidates, or persist memory.
+- Conversation Context is not permanent memory, and scoped information is not automatically forgotten or deleted.
+- The Retrieval Coordinator and broader memory-decision flow are planned services unless separately implemented.
 """
 
 
@@ -164,9 +72,15 @@ def build_user_preferences_context(user_id: int) -> dict:
     """Load authenticated per-user settings and traits for AI context assembly."""
     settings = memory_database.get_user_settings(user_id)
     traits = memory_database.get_user_personality_traits(user_id)
+    feedback = memory_database.get_personality_trait_feedback(user_id)
     return {
         "settings": settings,
-        "traits": [row["trait"] for row in traits],
+        "traits": traits,
+        "user_traits": [row for row in traits if row.get("owner") == "user"],
+        "aetheraeon_traits": [
+            row for row in traits if row.get("owner") == "aetheraeon"
+        ],
+        "trait_feedback": feedback,
     }
 
 # ============================================================
@@ -336,10 +250,14 @@ def build_long_term_memory(
 
     for item in chroma_results:
 
-        # Handle tuple or dict formats safely
+        # Preserve the existing dictionary format and normalize the
+        # (memory_id, document, metadata) tuples returned by Chroma recall.
         if isinstance(item, dict):
             content = str(item.get("document", ""))
             metadata = item.get("metadata", {})
+        elif isinstance(item, tuple) and len(item) >= 3:
+            content = str(item[1])
+            metadata = item[2] if isinstance(item[2], dict) else {}
         else:
             content = str(item)
             metadata = {}
@@ -630,6 +548,7 @@ def build_long_term_memory_block(recall_block):
 
 def _build_conversation_context(
     conversation_id,
+    user_id=None,
     max_history_messages=20,
     summary_keep_recent=5,
     summary_max_entries=10,
@@ -641,7 +560,7 @@ def _build_conversation_context(
     # Retrieve stored conversation messages from database.
     # --------------------------------------------------------
 
-    conversation_history = memory_database.get_messages(conversation_id)
+    conversation_history = memory_database.get_messages(conversation_id, user_id=user_id)
     print("[CTX DEBUG] get_messages type:", type(memory_database.get_messages))
     # --------------------------------------------------------
     # HISTORY LIMITING
@@ -704,8 +623,11 @@ def _build_conversation_context(
                 f"{message_content[:120]}"
             )
 
+        # Prefer the entries closest to the recent-message window.  Taking the
+        # first entries caused newer context to disappear whenever the summary
+        # itself reached its cap.
         conversation_summary = " | ".join(
-            summary_parts[:summary_max_entries]
+            summary_parts[-summary_max_entries:]
         )
 
     # --------------------------------------------------------

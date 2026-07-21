@@ -1,138 +1,21 @@
 """
-========================================================
-AETHERAEON — AUTOMATION PLAYBOOK ENGINE
-========================================================
+Aetheraeon AI - Automation Playbooks
 
-FILE PURPOSE:
-This file manages reusable automation workflows,
-task sequences, and multi-step execution routines.
+Purpose:
+Manages reusable workflow definitions and coordinates approved multi-step automation through existing execution systems.
 
-Playbooks allow the AI system to execute structured,
-repeatable operational flows without hardcoding logic
-inside the orchestrator or tool execution layers.
+Architecture Layer:
+Workflow automation support within the Tool Execution Layer.
 
-========================================================
-SYSTEM ROLE:
-"Workflow Automation Layer"
+Responsibilities:
+- Store and validate workflow definitions and ordered steps.
+- Coordinate workflow state and collect step results.
+- Delegate executable actions to registered tool and external integration paths.
 
-This file defines:
-- automation recipes
-- task chains
-- reusable execution sequences
-- operational procedures
-
-It does NOT perform AI reasoning.
-
-========================================================
-RESPONSIBILITIES:
-(automation_playbooks.py)
-
-- Define reusable automation workflows
-- Store multi-step execution plans
-- Execute chained operational tasks
-- Standardize repeated procedures
-- Coordinate tool execution sequences
-- Provide reusable operational templates
-- Support future autonomous task systems
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(automation_playbooks.py)
-
-This file MUST NOT:
-- Perform AI reasoning
-- Generate conversational responses
-- Access frontend/UI systems directly
-- Store long-term memory directly
-- Replace tool_executor.py
-- Replace ai_orchestrator.py
-
-This file ONLY defines and manages workflows.
-
-========================================================
-AUTOMATION PLAYBOOK FLOW:
-(automation_playbooks.py functions)
-
-User Request
-    ↓
-ai_orchestrator.py
-    ↓
-request_router.py
-    ↓
-tool_executor.py
-    ↓
-automation_playbooks.py
-    ↓
-execute workflow steps
-    ↓
-return execution results
-
-========================================================
-SYSTEM WIDE FLOW:
-(full system architecture)
-
-User Input
-    ↓
-api_gateway.py
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-tool_executor.py
-    ↓
-automation_playbooks.py   ← THIS FILE
-    ↓
-external_toolkit.py
-    ↓
-memory_database.py
-    ↓
-api_gateway.py
-    ↓
-Web UI
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-automation_playbooks.py depends on:
-- tool_executor.py         (tool execution layer)
-- external_toolkit.py      (external integrations)
-- system_security.py       (workflow safety validation)
-- system_logger.py         (workflow event logging)
-
-========================================================
-CORE RESPONSIBILITIES:
-(automation_playbooks.py)
-
-- Register automation workflows
-- Validate workflow structure
-- Execute sequential task chains
-- Handle workflow variables/state
-- Support reusable operational routines
-- Support future scheduled automation
-
-========================================================
-OUTPUT CONTRACT:
-(automation_playbooks.py returns)
-
-- execution_result
-- workflow_status
-- step_results
-- execution_metadata
-- optional error details
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Reusable Operational Intelligence"
-
-- Orchestrator decides
-- Playbooks coordinate
-- tool_executor executes
-- ExternalToolkit connects
-- Database stores
-
-========================================================
+Boundaries:
+- Playbooks do not infer user intent, make cognitive policy, authorize tools, or perform AI reasoning.
+- Every action remains subject to permissions, security checks, and execution-time validation.
+- The Cognitive Decision Engine and Planning System are planned policy and planning services, not implementations in this module.
 """
 
 # ============================================================
@@ -202,8 +85,10 @@ from core.ai_orchestrator import orchestrate_tool_plan
 # ------------------------------------------------------------
 
 from core import memory_interface  # if used elsewhere in system
+from core.memory_database import chroma_store
 from core.system_paths import PLAYBOOK_DIR
 from core.tool_registry import register_tool
+from core.service_manager import service_state
 
 # ------------------------------------------------------------
 # SYSTEM CONFIGURATION / STATUS
@@ -486,8 +371,10 @@ def run_playbook_step(
     message: str,
     payload: dict,
     session: dict,
-    memory: dict
-) -> None:
+    memory: dict,
+    *,
+    effective_user=None,
+) -> dict:
     """
     Execute a single automation playbook step.
 
@@ -534,7 +421,7 @@ def run_playbook_step(
         print(f"      [PLAYBOOK] Waiting {wait_seconds}s...")
 
         time.sleep(wait_seconds)
-        return
+        return {"success": True, "tool": "wait"}
 
     # --------------------------------------------------------
     # ACTION: CHAT RESPONSE
@@ -544,7 +431,7 @@ def run_playbook_step(
 
     if action_type == "chat":
 
-        orchestrate_tool_plan(
+        result = orchestrate_tool_plan(
             {
                 "tool": "chat",
                 "message": message
@@ -553,10 +440,11 @@ def run_playbook_step(
             memory,
             chroma_store,
             memory_interface.memory_recall,
-            service_state
+            service_state,
+            effective_user=effective_user,
         )
 
-        return
+        return result if isinstance(result, dict) else {"success": True, "tool": "chat"}
 
     # --------------------------------------------------------
     # ACTION: MAPPED TOOL EXECUTION
@@ -571,7 +459,7 @@ def run_playbook_step(
         decision_payload = action_handler(target)
 
         if decision_payload is None:
-            return
+            return {"success": True, "tool": "playbook"}
 
         # ----------------------------------------------------
         # OPTIONAL FIELD ENRICHMENT
@@ -593,16 +481,20 @@ def run_playbook_step(
         # EXECUTE FINAL DECISION
         # ----------------------------------------------------
 
-        orchestrate_tool_plan(
+        result = orchestrate_tool_plan(
             decision_payload,
             session,
             memory,
             chroma_store,
             memory_interface.memory_recall,
-            service_state
+            service_state,
+            effective_user=effective_user,
         )
 
-        return
+        return result if isinstance(result, dict) else {
+            "success": True,
+            "tool": decision_payload.get("tool", "playbook"),
+        }
 
     # --------------------------------------------------------
     # UNKNOWN ACTION HANDLING
@@ -615,6 +507,11 @@ def run_playbook_step(
         f"      [PLAYBOOK WARNING] Unknown action '{action_type}' "
         f"for target '{target}' — skipping step {step_index}."
     )
+    return {
+        "success": False,
+        "tool": "playbook",
+        "message": f"Unsupported playbook action: {action_type}",
+    }
     
     
     
@@ -634,8 +531,10 @@ def run_playbook_step(
 def run_playbook(
     playbook_name: str,
     session: dict,
-    memory: dict
-) -> None:
+    memory: dict,
+    *,
+    effective_user=None,
+) -> dict:
     """
     Execute a full automation playbook.
 
@@ -682,7 +581,11 @@ def run_playbook(
             print(
                 f"    Available: {', '.join(list_playbooks()) or 'none'}"
             )
-            return
+            return {
+                "success": False,
+                "tool": "playbook",
+                "message": f"Playbook '{playbook_name}' not found.",
+            }
 
     # --------------------------------------------------------
     # PLAYBOOK HEADER OUTPUT
@@ -713,15 +616,26 @@ def run_playbook(
             f"[{action_type}] {target or message}"
         )
 
-        run_playbook_step(
+        step_result = run_playbook_step(
             step_index,
             action_type,
             target,
             message,
             payload,
             session,
-            memory
+            memory,
+            effective_user=effective_user,
         )
+
+        if isinstance(step_result, dict) and step_result.get("success") is False:
+            message = step_result.get("message") or "A playbook step did not complete."
+            print(f"  [PLAYBOOK] Stopped: {message}")
+            return {
+                "success": False,
+                "tool": "playbook",
+                "step": step_index,
+                "message": message,
+            }
 
     # --------------------------------------------------------
     # PLAYBOOK COMPLETION
@@ -730,6 +644,7 @@ def run_playbook(
     # --------------------------------------------------------
 
     print(f"\n  [PLAYBOOK] '{playbook_definition['name']}' complete.")
+    return {"success": True, "tool": "playbook"}
     
     
 
@@ -750,7 +665,9 @@ def run_playbook(
 def handle_playbook_intent(
     user_input: str,
     session: dict,
-    memory: dict
+    memory: dict,
+    *,
+    effective_user=None,
 ) -> str:
     """
     Parse user input and trigger automation playbook actions.
@@ -819,11 +736,18 @@ def handle_playbook_intent(
 
         playbook_name = match.group(1).strip()
 
-        run_playbook(
+        playbook_result = run_playbook(
             playbook_name,
             session,
-            memory
+            memory,
+            effective_user=effective_user,
         )
+
+        if isinstance(playbook_result, dict) and not playbook_result.get("success"):
+            return (
+                f"Playbook '{playbook_name}' did not complete: "
+                f"{playbook_result.get('message') or 'A step failed.'}"
+            )
 
         return f"Playbook '{playbook_name}' complete."
 

@@ -1,3 +1,21 @@
+"""
+Aetheraeon AI - Service Registry
+
+Purpose:
+Defines and exposes metadata for services recognized by the current Aetheraeon runtime.
+
+Architecture Layer:
+Service Infrastructure Layer - service directory.
+
+Responsibilities:
+- Register supported service definitions and lookup metadata.
+- Provide consistent service information to management and health components.
+
+Boundaries:
+- Registry entries describe services but do not start, stop, authorize, or execute them.
+- This module does not make cognitive, routing, permission, or security decisions.
+"""
+
 # ========================================================
 # SERVICE REGISTRY — AETHERAEON
 # ========================================================

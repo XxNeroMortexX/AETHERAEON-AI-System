@@ -1,118 +1,21 @@
 """
-========================================================
-AETHERAEON — CONVERSATION TITLE ENGINE (MEMORY LABELING LAYER)
-========================================================
+Aetheraeon AI - Conversation Title Engine
 
-FILE PURPOSE:
-This file is responsible for generating short, meaningful
-titles for user conversations based on dialogue context.
+Purpose:
+Produces concise human-readable titles from supplied conversation context for navigation and display.
 
-It transforms raw conversation data into structured,
-human-readable labels used for UI display, memory indexing,
-and conversation history organization.
+Architecture Layer:
+Identity and Personality Layer - conversation metadata support.
 
-========================================================
-SYSTEM ROLE:
-"Context Labeling Layer" of the architecture.
+Responsibilities:
+- Extract local topic signals from provided conversation text.
+- Generate and normalize short conversation titles.
+- Return title data to the caller for persistence and presentation.
 
-It does NOT reason deeply or execute tools.
-It ONLY summarizes conversation intent into titles.
-
-========================================================
-RESPONSIBILITIES:
-(conversation_title_engine.py)
-
-- Analyze conversation context (short-term memory)
-- Detect user intent or topic theme
-- Generate concise conversation titles
-- Ensure consistent formatting for UI display
-- Improve memory navigation and indexing clarity
-- Prevent overly long or noisy titles
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(conversation_title_engine.py)
-
-This file MUST NOT:
-- Execute tools or external actions (tool_executor.py handles this)
-- Modify memory database directly (memory_database.py handles this)
-- Perform full reasoning chains (ai_orchestrator.py handles this)
-- Call external APIs or web services
-- Store persistent data
-
-It ONLY returns formatted title strings.
-
-========================================================
-TITLE GENERATION FLOW:
-(conversation_title_engine.py functions)
-
-Conversation Context Input
-    ↓
-extract_key_topics()
-    ↓
-identify_primary_intent()
-    ↓
-compress_context_signal()
-    ↓
-generate_title()
-    ↓
-return short UI-friendly title
-
-========================================================
-SYSTEM WIDE FLOW:
-(full system architecture integration)
-
-User Input
-    ↓
-api_gateway.py
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-conversation_title_engine.py   ← THIS FILE
-    ↓
-title returned to memory system
-    ↓
-memory_database.py stores title
-    ↓
-UI displays conversation label
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-conversation_title_engine.py depends on:
-- llm_interface.py          (optional for title generation)
-- memory_context_builder.py (context compression input)
-- personality_engine.py     (tone consistency for titles)
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- extract_key_topics()
-- identify_primary_intent()
-- compress_context_signal()
-- generate_title()
-
-========================================================
-OUTPUT CONTRACT:
-(conversation_title_engine.py returns)
-
-- title (string)
-- optional metadata (keywords, confidence)
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Compression of Meaning"
-
-- Orchestrator THINKS
-- Title Engine SUMMARIZES
-- tool_executor ACTS
-- Database STORES
-- UI DISPLAYS
-
-========================================================
+Boundaries:
+- Topic analysis for a title is not the governing Natural Language Understanding contract or a cognitive policy decision.
+- This module does not persist conversations, modify memory, execute tools, or perform full reasoning.
+- Personality may influence presentation style only.
 """
 
 # ============================================================

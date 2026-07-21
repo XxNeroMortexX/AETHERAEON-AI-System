@@ -1,191 +1,21 @@
 """
-========================================================
-AETHERAEON — SYSTEM OBSERVABILITY & LOGGING LAYER
-========================================================
+Aetheraeon AI - System Logger
 
-FILE PURPOSE:
-This file provides centralized logging, diagnostics,
-observability, telemetry, and runtime event tracking for
-the entire Aetheraeon AI platform.
+Purpose:
+Provides centralized operational logging and event reporting for the current Aetheraeon runtime.
 
-It serves as the unified logging interface used by every
-major subsystem to record operational activity, assist
-debugging, improve transparency, and support long-term
-system maintainability.
+Architecture Layer:
+Cognitive Observability Layer - logging support.
 
-Rather than influencing system behavior, this component
-records what happens throughout the AI architecture and
-provides a historical view of system operation.
+Responsibilities:
+- Record formatted runtime, warning, error, security, tool, memory, and service events.
+- Provide consistent operational metadata for diagnostics and correlation.
+- Support current console and configured logging destinations.
 
-========================================================
-SYSTEM ROLE:
-"Observability & Logging Layer" of the architecture.
-
-This file does NOT:
-- Perform AI reasoning
-- Execute tools
-- Route requests
-- Modify application state
-- Store AI memory
-
-It ONLY:
-- Records
-- Formats
-- Reports
-- Observes
-- Diagnoses
-
-========================================================
-CURRENT RESPONSIBILITIES:
-(system_logger.py)
-
-- Record runtime events
-- Display informational messages
-- Record warnings and errors
-- Provide consistent log formatting
-- Support startup diagnostics
-- Assist development debugging
-- Improve system observability
-- Provide centralized logging utilities
-
-========================================================
-FUTURE RESPONSIBILITIES (ARCHITECTURE ROADMAP):
-
-As Aetheraeon evolves, this component is planned to
-become the centralized observability and telemetry
-subsystem for the entire AI platform.
-
-Future capabilities may include:
-
-- Structured logging
-- Configurable log levels
-- Log categorization
-- Session tracing
-- AI reasoning traces
-- Tool execution traces
-- Memory operation auditing
-- Database diagnostics
-- Performance timing metrics
-- Resource utilization reporting
-- Security audit logging
-- Event correlation IDs
-- Persistent log storage
-- Automatic log rotation
-- Historical diagnostics
-- Distributed logging
-- External monitoring integrations
-- Dashboard and analytics support
-
-These capabilities represent planned architectural goals
-and may be implemented incrementally as the platform
-continues to mature.
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(system_logger.py)
-
-This file MUST NOT:
-
-- Perform AI reasoning or orchestration
-- Execute tools or external commands
-- Modify databases or memory
-- Change system configuration
-- Handle HTTP/API requests
-- Route user requests
-- Generate AI responses
-- Implement business logic
-
-It ONLY records and reports operational events.
-
-========================================================
-SYSTEM LOGGER FLOW:
-(system_logger.py)
-
-System Event
-        ↓
-Receive logging request
-        ↓
-Format log entry
-        ↓
-Assign log level/category
-        ↓
-Output to configured destinations
-        ↓
-Return control to calling component
-
-========================================================
-SYSTEM WIDE POSITION:
-
-                User
-                  │
-                  ▼
-          api_gateway.py
-                  │
-                  ▼
-        request_router.py
-                  │
-                  ▼
-        ai_orchestrator.py
-                  │
-     ┌────────────┼────────────┐
-     │            │            │
-     ▼            ▼            ▼
-tool_executor  memory_interface  external_toolkit
-     │            │            │
-     └────────────┼────────────┘
-                  │
-                  ▼
-        system_logger.py
-                  │
-                  ▼
-     Console • Log Files • Telemetry
-        Diagnostics • Monitoring
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-system_logger.py may be used by:
-
-- api_gateway.py
-- request_router.py
-- ai_orchestrator.py
-- tool_executor.py
-- memory_interface.py
-- memory_database.py
-- system_health_check.py
-- external_toolkit.py
-- model_registry.py
-
-========================================================
-OUTPUT CONTRACT:
-
-This component returns or produces:
-
-- Formatted log messages
-- Runtime diagnostics
-- Error reports
-- Warning messages
-- Debug information
-- Telemetry events
-- Optional logging metadata
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Everything Important Leaves a Trace."
-
-Every major event within Aetheraeon should be observable,
-traceable, and diagnosable.
-
-The logging system exists to improve transparency,
-reliability, maintainability, and operational insight
-without influencing how the AI thinks or behaves.
-
-By separating observability from execution, Aetheraeon
-remains modular, predictable, and easier to debug as the
-platform continues to evolve.
-
-========================================================
+Boundaries:
+- Logging observes outcomes and does not make decisions, execute actions, or modify application state.
+- Logs must not capture private chain-of-thought, hidden reasoning traces, private prompts, secrets, credentials, or raw embeddings.
+- Cognitive Trace summaries and the Admin Cognitive Inspector are planned capabilities; the logger is not their policy authority.
 """
 
 # ============================================================

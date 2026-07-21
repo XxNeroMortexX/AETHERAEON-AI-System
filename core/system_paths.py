@@ -1,109 +1,21 @@
 """
-========================================================
-AETHERAEON — SYSTEM PATH MANAGEMENT LAYER
-========================================================
+Aetheraeon AI - System Paths
 
-FILE PURPOSE:
-This file is responsible for all path-related operations
-across the AI system.
+Purpose:
+Provides centralized project paths, path normalization, and reusable filesystem-boundary checks.
 
-It ensures that file system access is safe, validated,
-and consistent across all modules that interact with
-local directories or external file paths.
+Architecture Layer:
+Configuration and Utility Layers - filesystem support.
 
-========================================================
-SYSTEM ROLE:
-"Path Safety + Resolution Layer" of the architecture.
+Responsibilities:
+- Resolve established project and runtime locations consistently.
+- Normalize and validate path values for calling modules.
+- Support security and execution components with path-boundary information.
 
-It does NOT execute system commands.
-It does NOT perform AI reasoning.
-
-It ONLY validates, normalizes, and resolves file paths.
-
-========================================================
-RESPONSIBILITIES:
-(system_paths.py)
-
-- Normalize and sanitize file paths
-- Validate directory boundaries (security enforcement)
-- Prevent directory traversal attacks
-- Extract and parse system paths from commands
-- Ensure safe access to allowed directories only
-- Provide utility functions for file system operations
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(system_paths.py)
-
-This file MUST NOT:
-- Execute shell commands (tool_executor.py handles this)
-- Perform AI reasoning (core_cognition.py handles this)
-- Access or modify memory (memory_database.py handles this)
-- Perform HTTP/API requests (external_toolkit.py handles this)
-- Manage tool execution logic
-
-It ONLY handles safe path logic.
-
-========================================================
-PATH SAFETY MODEL:
-(system_paths.py)
-
-All paths entering the system must be:
-
-INPUT
-  ↓
-sanitize_file_path()
-  ↓
-_validate_format()
-  ↓
-_is_within_allowed_directories()
-  ↓
-return SAFE_PATH or None
-
-========================================================
-SYSTEM WIDE FLOW:
-
-User Input / Tool Request
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-tool_executor.py
-    ↓
-system_paths.py   ← THIS FILE
-    ↓
-system_security.py (enforcement layer)
-    ↓
-filesystem access (SAFE ONLY)
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-system_paths.py is used by:
-- tool_executor.py        (file operations)
-- system_security.py      (validation enforcement)
-- external_toolkit.py     (file-based tools)
-- api_gateway.py          (path normalization for requests)
-
-========================================================
-OUTPUT CONTRACT:
-(system_paths.py returns)
-
-- sanitized_path (string or None)
-- validation_result (bool)
-- extracted_paths (list)
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Never trust raw paths"
-
-- System must assume ALL input paths are unsafe
-- Only validated paths may reach execution layer
-- Security is enforced BEFORE execution
-
-========================================================
+Boundaries:
+- Path checks support security enforcement but do not authorize an operation.
+- This module does not execute commands, perform cognitive processing, access memory, or establish tool policy.
+- Security components remain authoritative before filesystem actions execute.
 """
 
 # ============================================================

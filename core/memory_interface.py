@@ -1,296 +1,21 @@
 """
-========================================================
-AETHERAEON — MEMORY INTERFACE (MEMORY ACCESS ABSTRACTION LAYER)
-========================================================
-
-FILE PURPOSE:
-
-This file provides the unified memory and persistence access
-interface for the Aetheraeon AI system.
-
-It acts as the abstraction boundary between AI intelligence
-layers and underlying storage implementations.
-
-Higher-level AI components should communicate through this
-layer instead of directly accessing:
-
-- MariaDB
-- ChromaDB
-- Repository modules
-- Storage implementations
-
-========================================================
-SYSTEM ROLE:
-
-"Memory Access Gateway Layer"
-
-This file provides:
-
-- Unified memory operations
-- Storage abstraction
-- Data translation
-- Persistence access routing
-- Normalized memory responses
-
-It does NOT create intelligence.
-
-It only provides controlled access to stored information.
-
-========================================================
-ARCHITECTURAL PURPOSE:
-
-The Memory Interface exists to protect AI layers from
-storage implementation changes.
-
-Current:
-
-ai_orchestrator.py
-        ↓
-memory_interface.py
-        ↓
-memory_database.py
-        ↓
-MariaDB / ChromaDB
-
-
-Future:
-
-ai_orchestrator.py
-        ↓
-memory_interface.py
-        ↓
-Repository Layer
-        ↓
-Database / Vector Storage
-
-
-The AI architecture should not need to change when the
-storage architecture changes.
-
-========================================================
-RESPONSIBILITIES:
-(memory_interface.py)
-
-- Provide unified memory access functions
-- Provide conversation storage access
-- Provide message storage access
-- Provide user settings access
-- Provide semantic memory operations
-- Normalize storage results
-- Bridge AI layers with persistence layers
-- Maintain storage abstraction boundaries
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-
-(memory_interface.py)
-
-This file MUST NOT:
-
-- Perform AI reasoning
-  (ai_orchestrator.py handles this)
-
-- Generate AI responses
-  (llm_interface.py handles model communication)
-
-- Execute tools
-  (tool_executor.py handles execution)
-
-- Perform HTTP/API routing
-  (api_gateway.py handles transport)
-
-- Build cognitive context
-  (memory_context_builder.py handles this)
-
-- Implement database engines
-  (database/repository layers handle storage)
-
-This file ONLY provides access abstraction.
-
-========================================================
-MEMORY INTERFACE FLOW:
-
-AI Request
-
-    ↓
-
-ai_orchestrator.py
-
-    ↓
-
-memory_interface.py
-
-    ↓
-
-Storage Provider
-
-(memory_database.py currently)
-
-    ↓
-
-MariaDB / ChromaDB
-
-    ↓
-
-Normalized Result
-
-    ↓
-
-ai_orchestrator.py
-or
-memory_context_builder.py
-
-========================================================
-SYSTEM WIDE MEMORY FLOW:
-
-User Input
-
-    ↓
-
-api_gateway.py
-
-    ↓
-
-request_router.py
-
-    ↓
-
-ai_orchestrator.py
-
-    ↓
-
-memory_interface.py   ← THIS FILE
-
-    ↓
-
-memory_database.py
-
-    ↓
-
-MariaDB / ChromaDB
-
-    ↓
-
-memory_context_builder.py
-
-    ↓
-
-llm_interface.py
-
-    ↓
-
-AI Response
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-Current:
-
-memory_interface.py depends on:
-
-- memory_database.py
-- config_loader.py
-- agent_identity.py
-
-
-Used by:
-
-- ai_orchestrator.py
-- request_router.py
-- memory_context_builder.py
-
-========================================================
-CORE FUNCTIONS:
-(memory_interface.py)
-
-Memory State:
-
-- get_memory_state()
-- update_memory_state()
-
-Conversation:
-
-- create_conversation()
-- delete_conversation()
-- pin_conversation()
-
-Messages:
-
-- save_message_user()
-- save_message_ai()
-
-User Settings:
-
-- get_user_settings()
-
-Semantic Memory:
-
-- memory_store()
-- memory_recall()
-- memory_update()
-- memory_delete()
-- memory_exists_similar()
-
-Memory Persistence:
-
-- load_memory()
-- save_memory()
-
-Utility:
-
-- extract_memory_text()
-
-========================================================
-OUTPUT CONTRACT:
-
-(memory_interface.py returns)
-
-- normalized memory objects
-- conversation records
-- message records
-- user settings
-- semantic recall results
-- storage operation results
-- success/failure states
-
-========================================================
-FUTURE ARCHITECTURE ROLE:
-
-memory_interface.py becomes the permanent abstraction
-gateway for all memory and persistence operations.
-
-Future repository structure:
-
-memory_interface.py
-
-        ↓
-
-├── user_repository.py
-├── conversation_repository.py
-├── settings_repository.py
-├── playbook_repository.py
-└── memory_repository.py
-
-        ↓
-
-MariaDB / ChromaDB
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Memory Should Be Accessible Without Knowing Storage"
-
-- Orchestrator THINKS
-- MemoryInterface CONNECTS
-- ContextBuilder STRUCTURES
-- Repository Layer STORES
-- Database Layer PERSISTS
-- LLMInterface COMMUNICATES
-
-This separation allows Aetheraeon AI to evolve its
-memory architecture without rewriting intelligence layers.
-
-========================================================
+Aetheraeon AI - Memory Interface
+
+Purpose:
+Provides the stable abstraction used by current callers to access memory and related persistence operations.
+
+Architecture Layer:
+Memory Intelligence Layer - memory access abstraction.
+
+Responsibilities:
+- Execute approved memory operations through the current persistence implementation.
+- Normalize retrieval, storage, update, deletion, and similarity results.
+- Isolate higher-level components from MariaDB and ChromaDB implementation details.
+
+Boundaries:
+- This interface does not decide whether information is Conversation Context, Short-Term Scoped Memory, Candidate Memory, or Long-Term Memory.
+- It does not authorize candidate promotion, bypass ownership or security policy, or automatically forget retained information.
+- Memory Intelligence and the planned Cognitive Decision Engine determine policy; storage layers persist approved outcomes.
 """
 
 # ============================================================
@@ -304,6 +29,7 @@ import json          # JSON serialization / memory persistence
 import re            # Natural language pattern matching for memory commands
 import os            # File system operations (memory storage paths)
 import time          # Timing / debug utilities (optional tracing)
+from uuid import uuid4
 from datetime import datetime  # Timestamp generation for memory entries
 
 
@@ -388,6 +114,14 @@ from core.memory_database import (
     upsert_user_settings as db_upsert_user_settings,
     get_user_personality_traits as db_get_user_personality_traits,
     add_user_personality_trait as db_add_user_personality_trait,
+    update_user_personality_trait as db_update_user_personality_trait,
+    create_aetheraeon_personality_trait as db_create_aetheraeon_personality_trait,
+    update_aetheraeon_personality_trait as db_update_aetheraeon_personality_trait,
+    delete_aetheraeon_personality_trait as db_delete_aetheraeon_personality_trait,
+    add_personality_trait_feedback as db_add_personality_trait_feedback,
+    get_personality_trait_feedback as db_get_personality_trait_feedback,
+    get_personality_trait_history as db_get_personality_trait_history,
+    get_personality_trait_candidates as db_get_personality_trait_candidates,
     delete_user_personality_trait as db_delete_user_personality_trait,
 )
 
@@ -397,11 +131,35 @@ def get_user_settings(user_id: int) -> dict:
 def upsert_user_settings(user_id: int, settings: dict) -> None:
     return db_upsert_user_settings(user_id, settings)
 
-def get_user_personality_traits(user_id: int) -> list[dict]:
-    return db_get_user_personality_traits(user_id)
+def get_user_personality_traits(user_id: int, owner=None, include_inactive=False) -> list[dict]:
+    return db_get_user_personality_traits(user_id, owner, include_inactive)
 
-def add_user_personality_trait(user_id: int, trait: str) -> dict | None:
-    return db_add_user_personality_trait(user_id, trait)
+def add_user_personality_trait(user_id: int, trait: str = None, **fields) -> dict | None:
+    return db_add_user_personality_trait(user_id, trait, **fields)
+
+def update_user_personality_trait(user_id: int, trait_id: int, changes: dict) -> dict | None:
+    return db_update_user_personality_trait(user_id, trait_id, changes)
+
+def create_aetheraeon_personality_trait(user_id: int, **fields) -> dict | None:
+    return db_create_aetheraeon_personality_trait(user_id, **fields)
+
+def update_aetheraeon_personality_trait(user_id: int, trait_id: int, changes: dict) -> dict | None:
+    return db_update_aetheraeon_personality_trait(user_id, trait_id, changes)
+
+def delete_aetheraeon_personality_trait(user_id: int, trait_id: int) -> bool:
+    return db_delete_aetheraeon_personality_trait(user_id, trait_id)
+
+def add_personality_trait_feedback(user_id: int, trait_id: int, correction: str) -> dict | None:
+    return db_add_personality_trait_feedback(user_id, trait_id, correction)
+
+def get_personality_trait_feedback(user_id: int) -> list[dict]:
+    return db_get_personality_trait_feedback(user_id)
+
+def get_personality_trait_history(user_id: int) -> list[dict]:
+    return db_get_personality_trait_history(user_id)
+
+def get_personality_trait_candidates(user_id: int, include_promoted=False) -> list[dict]:
+    return db_get_personality_trait_candidates(user_id, include_promoted)
 
 def delete_user_personality_trait(
     user_id: int,
@@ -433,8 +191,26 @@ def pin_conversation(conv_uuid: str, user_id: int, pinned: bool) -> bool:
 def save_message_user(conversation_id, user_id, content):
     return db_save_message_user(conversation_id, user_id, content)
 
-def save_message_ai(conversation_id, user_id, content, tool_used=None):
-    return db_save_message_ai(conversation_id, user_id, content, tool_used)
+def save_message_ai(
+    conversation_id,
+    user_id,
+    content,
+    tool_used=None,
+    metadata=None,
+):
+    """Persist an AI reply through the database interface.
+
+    ``tool_used`` and ``metadata`` remain optional so legacy three- and
+    four-argument callers keep working. The database owns timestamp creation
+    and accepts either structured metadata or an existing serialized value.
+    """
+    if metadata is not None:
+        return db_save_message_ai(
+            conversation_id, user_id, content, tool_used, metadata
+        )
+    if tool_used is not None:
+        return db_save_message_ai(conversation_id, user_id, content, tool_used)
+    return db_save_message_ai(conversation_id, user_id, content)
     
 # ============================================================
 # MEMORY STORAGE INTERFACE
@@ -469,20 +245,54 @@ def memory_store(
 # ============================================================
 
 from core.memory_database import chroma_recall_with_meta
+from core.retrieval_coordinator import ChromaRetrievalAdapter, CoordinatedRetrieval
+
+
+def memory_recall_with_contract(
+    query,
+    n=5,
+    user_id=None,
+    return_status=False,
+    *,
+    trace_id=None,
+) -> CoordinatedRetrieval:
+    """Observe an unchanged existing ChromaDB recall through RetrievalResult.
+
+    The existing recall callable receives the same arguments as the legacy
+    wrapper.  This helper is the Phase 6 structured retrieval boundary; it
+    neither selects memory policy nor transforms, filters, injects, or stores
+    the returned content.
+    """
+
+    result_limit = n if isinstance(n, int) and not isinstance(n, bool) and n >= 0 else None
+    correlation_id = trace_id or f"retrieval-{uuid4().hex}"
+    return ChromaRetrievalAdapter(chroma_recall_with_meta).retrieve(
+        query,
+        n,
+        user_id=user_id,
+        return_status=return_status,
+        trace_id=correlation_id,
+        result_limit=result_limit,
+        raise_on_error=True,
+    )
 
 
 def memory_recall(
     query,
-    n=5
+    n=5,
+    user_id=None,
+    return_status=False,
 ):
     """
     Retrieve semantic memories with metadata from ChromaDB.
     """
 
-    return chroma_recall_with_meta(
+    return memory_recall_with_contract(
         query,
-        n
-    )
+        n,
+        user_id=user_id,
+        return_status=return_status,
+    ).raw_output
     
 
 # ============================================================
@@ -498,18 +308,29 @@ from core.memory_database import chroma_update_by_id
 def memory_update(
     memory_id,
     new_text,
-    new_metadata=None
+    new_metadata=None,
+    *,
+    return_receipt=False,
 ):
     """
     Update an existing memory entry and optionally replace
     its metadata.
     """
 
-    return chroma_update_by_id(
+    success = chroma_update_by_id(
         memory_id,
         new_text,
         new_metadata
     )
+    if not return_receipt:
+        return success
+    return {
+        "operation": "update",
+        "memory_id": memory_id,
+        "success": bool(success),
+        "status": "completed" if success else "failed",
+        "reason": None if success else "ChromaDB did not confirm the update.",
+    }
 
 
 # ============================================================
@@ -523,15 +344,24 @@ from core.memory_database import chroma_delete_by_id
 
 
 def memory_delete(
-    memory_id
+    memory_id,
+    *,
+    return_receipt=False,
 ):
     """
     Delete a memory entry by its unique identifier.
     """
 
-    return chroma_delete_by_id(
-        memory_id
-    )
+    success = chroma_delete_by_id(memory_id)
+    if not return_receipt:
+        return success
+    return {
+        "operation": "delete",
+        "memory_id": memory_id,
+        "success": bool(success),
+        "status": "completed" if success else "failed",
+        "reason": None if success else "ChromaDB did not confirm the deletion.",
+    }
     
 from core.memory_database import create_conversation as db_create_conversation
 
@@ -581,7 +411,8 @@ from core.memory_database import chroma_exists_similar
 
 def memory_exists_similar(
     text,
-    threshold=0.95
+    threshold=0.95,
+    user_id=None,
 ):
     """
     Returns True if a semantically similar memory already exists.
@@ -589,7 +420,8 @@ def memory_exists_similar(
 
     return chroma_exists_similar(
         text,
-        threshold
+        threshold,
+        user_id=user_id,
     )
 
 # ============================================================

@@ -1,184 +1,20 @@
 """
-========================================================
-AETHERAEON — SYSTEM HEALTH MONITOR (DIAGNOSTICS LAYER)
-========================================================
+Aetheraeon AI - System Health Monitor
 
-FILE PURPOSE:
-This file is responsible for monitoring the operational
-health, availability, and readiness of the Aetheraeon AI
-platform.
+Purpose:
+Checks the operational availability and readiness of services required by the current Aetheraeon runtime.
 
-It verifies that critical system components are online,
-responsive, and functioning correctly before or during
-system operation.
+Architecture Layer:
+Service Infrastructure Layer - diagnostics and health monitoring.
 
-Rather than performing AI reasoning or executing user
-requests, this component provides centralized diagnostics
-used to ensure overall platform stability.
+Responsibilities:
+- Report readiness for configured models, databases, memory storage, services, and integrations.
+- Return structured health and startup diagnostic information.
+- Support operational monitoring without changing the systems being observed.
 
-========================================================
-SYSTEM ROLE:
-"Diagnostics & Monitoring Layer" of the architecture.
-
-This file does NOT:
-- Perform AI reasoning
-- Execute tools
-- Modify application state
-
-It ONLY:
-- Observes
-- Validates
-- Reports
-- Diagnoses
-
-========================================================
-CURRENT RESPONSIBILITIES:
-(system_health_check.py)
-
-- Verify AI model availability
-- Check database connectivity
-- Validate memory system readiness
-- Verify external service availability
-- Monitor automation service readiness
-- Aggregate diagnostic information
-- Generate structured health reports
-- Support startup diagnostics
-- Support runtime health monitoring
-
-========================================================
-FUTURE RESPONSIBILITIES (ARCHITECTURE ROADMAP):
-
-As Aetheraeon evolves, this component is planned to become
-the centralized diagnostics subsystem for the platform.
-
-Future capabilities may include:
-
-- CPU utilization monitoring
-- Memory (RAM) monitoring
-- GPU monitoring
-- Disk space monitoring
-- Network connectivity diagnostics
-- Service uptime tracking
-- Response latency monitoring
-- Dependency validation
-- Resource utilization reporting
-- Predictive diagnostics
-- Automated recovery recommendations
-- Historical health reporting
-
-These capabilities represent planned architectural goals
-and may be implemented incrementally over time.
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(system_health_check.py)
-
-This file MUST NOT:
-
-- Perform AI reasoning or orchestration
-- Execute tools or external actions
-- Modify databases or memory
-- Change system configuration
-- Handle HTTP/API requests
-- Route user requests
-- Generate conversational responses
-
-It ONLY monitors and reports system health.
-
-========================================================
-SYSTEM HEALTH FLOW:
-(system_health_check.py)
-
-Startup or Health Request
-        ↓
-Collect service status
-        ↓
-Validate dependencies
-        ↓
-Check database connectivity
-        ↓
-Check AI model availability
-        ↓
-Check external integrations
-        ↓
-Aggregate diagnostics
-        ↓
-Generate structured health report
-        ↓
-Return status to calling component
-
-========================================================
-SYSTEM WIDE POSITION:
-
-                 User
-                   │
-                   ▼
-          api_gateway.py
-                   │
-                   ▼
-        request_router.py
-                   │
-         ┌─────────┴─────────┐
-         │                   │
-         ▼                   ▼
-ai_orchestrator.py   system_health_check.py
-                             │
-                             ▼
-                   Diagnostics Report
-                             │
-                             ▼
-                     system_logger.py
-                             │
-                             ▼
-                      UI / Debug Tools
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-system_health_check.py may interact with:
-
-- llm_interface.py
-- model_registry.py
-- memory_interface.py
-- memory_database.py
-- tool_executor.py
-- external_toolkit.py
-- system_logger.py
-- config_loader.py
-
-========================================================
-OUTPUT CONTRACT:
-
-This component returns structured diagnostic information.
-
-Typical outputs include:
-
-- Overall system status
-- Individual service status
-- Database connectivity
-- AI model readiness
-- Memory system status
-- External service availability
-- Diagnostic messages
-- Startup readiness
-- Runtime health information
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Observe Everything. Modify Nothing."
-
-A healthy AI system begins with reliable infrastructure.
-
-The System Health Monitor provides centralized visibility
-into the operational state of Aetheraeon without influencing
-its behavior.
-
-By separating diagnostics from execution, the platform
-remains modular, predictable, maintainable, and easier to
-expand as new capabilities are introduced.
-
-========================================================
+Boundaries:
+- Health checks are passive and do not perform reasoning, route user requests, authorize actions, or repair services automatically.
+- Future monitoring and dashboard capabilities remain planned until separately implemented.
 """
 
 # ============================================================

@@ -1,128 +1,21 @@
 """
-========================================================
-AETHERAEON — SYSTEM SECURITY LAYER
-========================================================
+Aetheraeon AI - System Security
 
-FILE PURPOSE:
-This file provides centralized security, validation,
-sanitization, and safety enforcement for the AI system.
+Purpose:
+Provides authoritative server-side safety validation for operations handled by the current Aetheraeon runtime.
 
-It protects the system from unsafe operations,
-invalid inputs, unauthorized actions, and
-dangerous execution requests.
+Architecture Layer:
+Security Layer.
 
-========================================================
-SYSTEM ROLE:
-"Security & Validation Layer" of the architecture.
+Responsibilities:
+- Validate supported commands, paths, payloads, and execution conditions.
+- Enforce established safety restrictions and return allow or deny results.
+- Supply sanitized values and policy-violation information to execution callers.
 
-This layer sits between user requests and system actions.
-
-Its job is to determine whether an operation is safe
-before execution is allowed to continue.
-
-========================================================
-RESPONSIBILITIES:
-(system_security.py)
-
-- Input validation
-- Command validation
-- Path validation
-- Filesystem safety checks
-- Permission enforcement
-- Execution restrictions
-- Security policy enforcement
-- Dangerous operation detection
-- Command sanitization
-- Directory boundary protection
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(system_security.py)
-
-This file MUST NOT:
-
-- Perform AI reasoning
-- Generate AI responses
-- Execute tools
-- Execute shell commands
-- Access LLM models directly
-- Manage conversation memory
-- Modify UI state
-- Perform orchestration logic
-
-It ONLY validates and protects.
-
-========================================================
-SYSTEM SECURITY FLOW:
-
-Incoming Request
-    ↓
-request_router.py
-    ↓
-tool_executor.py
-    ↓
-system_security.py
-    ↓
-Validation
-    ↓
-ALLOW or DENY
-    ↓
-tool_executor.py
-    ↓
-Execution (if approved)
-
-========================================================
-SYSTEM WIDE FLOW:
-
-User Input
-    ↓
-api_gateway.py
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-tool_executor.py
-    ↓
-system_security.py   ← THIS FILE
-    ↓
-external_toolkit.py
-    ↓
-Operating System / External Services
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-system_security.py commonly works with:
-
-- tool_executor.py
-- system_paths.py
-- system_utils.py
-- external_toolkit.py
-
-========================================================
-OUTPUT CONTRACT:
-
-Functions in this file return:
-
-- Boolean allow / deny decisions
-- Sanitized values
-- Validation results
-- Security error messages
-- Policy violation information
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Trust Nothing. Validate Everything."
-
-- User input is validated
-- Paths are validated
-- Commands are validated
-- Operations are validated
-- Security checks happen before execution
-
-========================================================
+Boundaries:
+- Cognitive recommendations, routing results, plans, and model output cannot bypass security enforcement.
+- This module does not perform reasoning, generate responses, execute tools, or manage memory.
+- Security validation is distinct from the planned Response Validator, which evaluates generated response integrity.
 """
 
 # ============================================================

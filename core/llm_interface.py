@@ -1,139 +1,21 @@
 """
-========================================================
-AETHERAEON — LLM INTERFACE (MODEL COMMUNICATION LAYER)
-========================================================
+Aetheraeon AI - LLM Interface
 
-FILE PURPOSE:
-This file is the centralized interface between the AI
-system and all Large Language Models (LLMs).
+Purpose:
+Provides the current communication boundary between Aetheraeon and configured language-model backends.
 
-It safely handles model communication, response parsing,
-timeouts, validation, and structured output handling.
+Architecture Layer:
+Core Intelligence Layer - model communication.
 
-========================================================
-SYSTEM ROLE:
-"Language Model Transport Layer"
+Responsibilities:
+- Send prepared prompts to configured models and receive generated output.
+- Normalize transport results and handle model communication failures.
+- Validate response availability and shape for downstream processing.
 
-This file DOES NOT perform reasoning itself.
-It ONLY handles communication with AI models.
-
-========================================================
-RESPONSIBILITIES:
-(llm_interface.py)
-
-- Send prompts to Ollama / LLM backends
-- Validate model responses
-- Normalize response structures
-- Handle malformed outputs safely
-- Prevent invalid AI response propagation
-- Handle model timeouts and failures
-- Parse structured JSON responses
-- Provide centralized LLM debugging
-
-========================================================
-STRICT BOUNDARIES (DO NOT BREAK):
-(llm_interface.py)
-
-This file MUST NOT:
-- Execute tools
-- Store memory
-- Perform orchestration logic
-- Access frontend/UI
-- Make routing decisions
-- Handle business logic
-
-It ONLY handles safe LLM communication.
-
-========================================================
-LLM INTERFACE FLOW:
-(llm_interface.py functions)
-
-Structured Prompt
-    ↓
-send request to model
-    ↓
-validate response object
-    ↓
-normalize output format
-    ↓
-parse response content
-    ↓
-handle errors/timeouts safely
-    ↓
-return clean AI response
-
-========================================================
-SYSTEM WIDE FLOW:
-(full system architecture)
-
-User Input
-    ↓
-api_gateway.py
-    ↓
-request_router.py
-    ↓
-ai_orchestrator.py
-    ↓
-llm_interface.py   ← THIS FILE
-    ↓
-Ollama / AI Model
-    ↓
-llm_interface.py
-    ↓
-ai_orchestrator.py
-    ↓
-tool_executor.py (optional)
-    ↓
-memory_database.py
-    ↓
-api_gateway.py
-    ↓
-Web UI
-
-========================================================
-KEY FILE DEPENDENCIES:
-
-llm_interface.py depends on:
-- model_registry.py
-- system_logger.py
-- config_loader.py
-
-Used by:
-- ai_orchestrator.py
-- conversation_title_engine.py
-- request_router.py
-
-========================================================
-CORE FUNCTIONS (THIS FILE):
-
-- ask_llm()
-- validate_response()
-- parse_response_content()
-- normalize_response()
-- handle_model_error()
-
-========================================================
-OUTPUT CONTRACT:
-(llm_interface.py returns)
-
-- validated response text
-- structured JSON output (optional)
-- error metadata (optional)
-- debug information (optional)
-
-========================================================
-DESIGN PHILOSOPHY:
-
-"Safe Model Communication Layer"
-
-- Orchestrator THINKS
-- LLM Interface COMMUNICATES
-- tool_executor ACTS
-- Database STORES
-- API TRANSPORTS
-- UI DISPLAYS
-
-========================================================
+Boundaries:
+- The LLM and this interface do not own cognitive policy, memory decisions, permissions, security, or tool authorization.
+- Transport and format checks do not replace the planned Response Validator.
+- Language generation is one component of the Cognitive Core, not the complete intelligence system.
 """
 
 

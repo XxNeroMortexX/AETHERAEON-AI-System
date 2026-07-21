@@ -49,6 +49,34 @@ CSS-011 Responsive Design
   --sidebar-w: 260px;
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
   --radius: 8px;
+  --app-font-family: "Consolas", "Courier New", monospace;
+  --base-font-size: 18px;
+  --chat-text-size: 16px;
+  --button-text-size: 16px;
+  --menu-text-size: 16px;
+  --header-text-size: 18px;
+  --code-text-size: 15px;
+  --chat-bg: var(--bg);
+  --ai-bubble: var(--surface);
+  --code-bg: var(--tag-bg);
+  --input-bg: var(--bg);
+  --input-border: var(--border);
+  --placeholder: var(--muted);
+  --button-bg: var(--tag-bg);
+  --button-hover: var(--surface2);
+  --button-active: var(--accent);
+  --button-disabled: var(--muted);
+  --sidebar-bg: var(--surface);
+  --sidebar-hover: var(--tag-bg);
+  --menu-bg: var(--surface);
+  --menu-hover: var(--tag-bg);
+  --info: var(--accent);
+  --router-chat: var(--muted);
+  --router-memory: var(--orange);
+  --router-code: var(--purple);
+  --router-personality: var(--muted);
+  --router-web: var(--muted);
+  --router-system: var(--accent);
 }
 
 /* ── Light Theme ───────────────────────────────────────────── */
@@ -117,13 +145,35 @@ CSS-011 Responsive Design
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: "Consolas", "Courier New", monospace;
+  font-family: var(--app-font-family);
+  font-size: var(--base-font-size);
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   cursor: none;
 }
+
+body[data-text-style="bold"] { font-weight: 700; }
+body[data-text-style="italic"] { font-style: italic; }
+body button { font-size: var(--button-text-size); }
+#user-menu, .sidebar-nav, #conv-list, #playbook-list { font-size: var(--menu-text-size); }
+#chat .bubble { font-size: var(--chat-text-size); }
+header, .modal-title, .msg-meta { font-size: var(--header-text-size); }
+.bubble pre, .bubble code { font-size: var(--code-text-size); }
+input::placeholder, textarea::placeholder { color: var(--placeholder); }
+#chat { background: var(--chat-bg); }
+#user-menu { background: var(--menu-bg); }
+.user-menu-item:hover { background: var(--menu-hover); }
+.conv-item:hover, .sidebar-nav button:hover { background: var(--sidebar-hover); }
+.modal-field input, .modal-field textarea, .modal-field select {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+}
+.modal-btn, .qbtn { background: var(--button-bg); }
+.modal-btn:hover, .qbtn:hover { background: var(--button-hover); }
+.modal-btn:active, .qbtn:active { background: var(--button-active); }
+.modal-btn:disabled, .qbtn:disabled { background: var(--button-disabled); }
 
 button,
 a,
@@ -274,6 +324,25 @@ Backend availability monitoring in aetheraeon.js.
   display: block;
 }
 
+.deployment-health {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.health-state {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 7px;
+  font-size: 0.58em;
+  text-align: center;
+  color: var(--muted);
+  background: var(--tag-bg);
+}
+.health-state.online { color: var(--green); border-color: color-mix(in srgb, var(--green) 55%, var(--border)); }
+.health-state.offline { color: var(--red); border-color: color-mix(in srgb, var(--red) 55%, var(--border)); }
+.health-state.unknown,
+.health-state.checking { color: var(--orange); }
+
 /* Initial authentication states previously declared inline in index.html. */
 #reg-fullname-field,
 #reg-username-field {
@@ -287,6 +356,13 @@ Backend availability monitoring in aetheraeon.js.
 .login-switch span {
   color: var(--accent);
   text-decoration: underline;
+}
+.link-button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  font-family: inherit;
 }
 
 /* ── Password field with show/hide eye toggle ────────────── */
@@ -350,7 +426,7 @@ Backend availability monitoring in aetheraeon.js.
    ============================================================ */
 #sidebar {
   width: var(--sidebar-w);
-  background: var(--surface);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -420,7 +496,7 @@ Backend availability monitoring in aetheraeon.js.
 
 .conv-dropdown-menu {
   position: absolute;
-  top: 28px;
+  top: calc(100% - 2px);
   right: 0;
   background: #1e1e1e;
   border: 1px solid #333;
@@ -491,6 +567,7 @@ Backend availability monitoring in aetheraeon.js.
 }
 .sidebar-nav-btn:hover {
   color: var(--text);
+  background: var(--sidebar-hover);
 }
 
 #conv-list,
@@ -528,7 +605,7 @@ Backend availability monitoring in aetheraeon.js.
   position: relative;
 }
 .conv-item:hover {
-  background: var(--tag-bg);
+  background: var(--sidebar-hover);
 }
 .conv-item.active {
   background: var(--you-bubble);
@@ -562,7 +639,8 @@ Backend availability monitoring in aetheraeon.js.
   transition: opacity 0.12s;
 }
 .conv-item:hover .conv-actions,
-.conv-item.active .conv-actions {
+.conv-item.active .conv-actions,
+.conv-actions.menu-open {
   opacity: 1;
   pointer-events: auto;
 }
@@ -692,7 +770,7 @@ Backend availability monitoring in aetheraeon.js.
 #user-menu {
   display: none;
   position: fixed;
-  background: var(--surface);
+  background: var(--menu-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px;
@@ -714,7 +792,7 @@ Backend availability monitoring in aetheraeon.js.
   transition: background 0.12s;
 }
 .user-menu-item:hover {
-  background: var(--tag-bg);
+  background: var(--menu-hover);
 }
 .user-menu-item.danger {
   color: var(--red);
@@ -723,6 +801,37 @@ Backend availability monitoring in aetheraeon.js.
   height: 1px;
   background: var(--border);
   margin: 4px 0;
+}
+.admin-only { display: none; }
+.admin-only.visible { display: flex; }
+
+#admin-view-banner {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 7px 12px;
+  color: #111;
+  background: var(--orange);
+  font-size: 0.75em;
+  font-weight: 700;
+}
+#admin-view-banner.visible { display: flex; }
+#maintenance-banner {
+  display: none;
+  padding: 8px 14px;
+  background: var(--orange);
+  color: #111;
+  text-align: center;
+  font-weight: 700;
+}
+#maintenance-banner.visible { display: block; }
+#admin-view-banner button {
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  padding: 2px 8px;
+  font-family: inherit;
 }
 
 /* ============================================================
@@ -912,6 +1021,23 @@ header {
   color: var(--muted);
   margin-top: 3px;
 }
+.search-load-more {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+}
+.search-load-more:hover {
+  border-color: var(--accent);
+}
+.search-message-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .search-close {
   float: right;
   background: none;
@@ -960,6 +1086,7 @@ The greeting rendering and rotation functions in aetheraeon.js.
   margin: auto 0;
   position: relative;
   isolation: isolate;
+  animation: none;
 }
 .temporary-greeting .bubble {
   font-size: 1em;
@@ -977,13 +1104,13 @@ The greeting rendering and rotation functions in aetheraeon.js.
   text-align: center;
 }
 /* Ready-state effects are CSS-only and loop until the greeting DOM is replaced. */
-.temporary-greeting.greeting-pulse-glow .bubble {
+.temporary-greeting .bubble.greeting-pulse-glow {
   animation: greetingPulseGlow 2.4s ease-in-out infinite;
 }
-.temporary-greeting.greeting-breathe .bubble {
+.temporary-greeting .bubble.greeting-breathe {
   animation: greetingBreathe 3.2s ease-in-out infinite;
 }
-.temporary-greeting.greeting-border-flow .bubble {
+.temporary-greeting .bubble.greeting-border-flow {
   border: 2px solid transparent;
   background:
     linear-gradient(var(--surface), var(--surface)) padding-box,
@@ -993,7 +1120,7 @@ The greeting rendering and rotation functions in aetheraeon.js.
     240% 100%;
   animation: greetingBorderFlow 2.6s linear infinite;
 }
-.temporary-greeting.greeting-shimmer .bubble::before {
+.temporary-greeting .bubble.greeting-shimmer::before {
   content: "";
   position: absolute;
   z-index: 0;
@@ -1011,21 +1138,24 @@ The greeting rendering and rotation functions in aetheraeon.js.
   transform: skewX(-18deg);
   animation: greetingShimmer 2.8s ease-in-out infinite;
 }
-.temporary-greeting.greeting-float .bubble {
+.temporary-greeting .bubble.greeting-float {
   animation: greetingFloat 2.8s ease-in-out infinite;
 }
-.temporary-greeting.greeting-cursor .bubble::after {
+.temporary-greeting .bubble.greeting-cursor::after {
   content: "\258D";
   color: var(--accent);
   margin-left: 5px;
   text-shadow: 0 0 8px var(--accent);
   animation: greetingCursorBlink 0.85s steps(1, end) infinite;
 }
-.temporary-greeting.greeting-cursor .bubble {
+.temporary-greeting .bubble.greeting-cursor {
   animation: greetingCursorAttention 2.4s ease-in-out infinite;
 }
-.temporary-greeting.greeting-energy-wave::before,
-.temporary-greeting.greeting-energy-wave::after {
+.temporary-greeting .bubble.greeting-energy-wave {
+  overflow: visible;
+}
+.temporary-greeting .bubble.greeting-energy-wave::before,
+.temporary-greeting .bubble.greeting-energy-wave::after {
   content: "";
   position: absolute;
   z-index: 0;
@@ -1035,10 +1165,10 @@ The greeting rendering and rotation functions in aetheraeon.js.
   pointer-events: none;
   animation: greetingEnergyWave 2.4s ease-out infinite;
 }
-.temporary-greeting.greeting-energy-wave::after {
+.temporary-greeting .bubble.greeting-energy-wave::after {
   animation-delay: 1.2s;
 }
-.temporary-greeting.greeting-focus-ring .bubble {
+.temporary-greeting .bubble.greeting-focus-ring {
   animation: greetingFocusRing 2.2s ease-in-out infinite;
 }
 .temporary-greeting.loading .bubble::before {
@@ -1050,7 +1180,7 @@ The greeting rendering and rotation functions in aetheraeon.js.
   border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
   border-top-color: var(--accent);
   border-radius: 50%;
-  animation: greetingSpinner 0.8s linear infinite;
+  animation: greetingSpinner 2.8s linear infinite;
 }
 .temporary-greeting.loading .bubble {
   min-width: 260px;
@@ -1060,7 +1190,7 @@ The greeting rendering and rotation functions in aetheraeon.js.
   font-style: normal;
   border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
   opacity: 1;
-  animation: greetingLoadingThink 1.35s ease-in-out infinite;
+  animation: greetingLoadingThink 4.7s ease-in-out infinite;
 }
 
 /* CSS-009: Animations */
@@ -1216,14 +1346,78 @@ The greeting rendering and rotation functions in aetheraeon.js.
   border-bottom-right-radius: 2px;
 }
 .msg-ai .bubble {
-  background: var(--surface);
+  background: var(--ai-bubble);
   border: 1px solid var(--border);
   border-bottom-left-radius: 2px;
 }
 
+.chat-choice-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  margin-top: 8px;
+  max-width: 320px;
+  width: 100%;
+}
+
+.chat-choice-actions.chat-choice-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 760px;
+}
+
+.chat-choice-button {
+  appearance: none;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78em;
+  min-width: 0;
+  padding: 7px 11px;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  white-space: normal;
+  width: 100%;
+  word-break: break-word;
+}
+
+.chat-choice-button:hover:not(:disabled),
+.chat-choice-button:focus-visible {
+  background: var(--surface);
+  border-color: var(--accent);
+  outline: none;
+}
+
+.chat-choice-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.chat-choice-button.selected {
+  background: var(--button-active);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+@media (max-width: 900px) {
+  .chat-choice-actions.chat-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-choice-actions,
+  .chat-choice-actions.chat-choice-grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: none;
+  }
+}
+
 /* ── Code blocks in chat ─────────────────────────────────── */
 .bubble code {
-  background: var(--tag-bg);
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 1px 5px;
@@ -1231,10 +1425,10 @@ The greeting rendering and rotation functions in aetheraeon.js.
   font-family: "Consolas", monospace;
 }
 .bubble pre {
-  background: var(--tag-bg);
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 10px 14px;
+  padding: 0;
   margin: 6px 0;
   overflow-x: auto;
   position: relative;
@@ -1242,12 +1436,28 @@ The greeting rendering and rotation functions in aetheraeon.js.
 .bubble pre code {
   background: none;
   border: none;
-  padding: 0;
+  padding: 8px 0 10px;
+  display: block;
+  min-width: max-content;
 }
-.code-copy-btn {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+.code-toolbar {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.code-language {
+  color: var(--muted);
+  font-size: 0.68em;
+  text-transform: uppercase;
+  margin-right: auto;
+}
+.code-copy-btn,
+.code-download-btn {
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--muted);
@@ -1260,6 +1470,143 @@ The greeting rendering and rotation functions in aetheraeon.js.
   color: var(--accent);
   border-color: var(--accent);
 }
+.code-download-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.code-line {
+  display: flex;
+  min-height: 1.5em;
+}
+.code-line-number {
+  width: 3.5em;
+  padding: 0 10px 0 6px;
+  color: var(--muted);
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.code-line-content {
+  padding: 0 12px;
+  white-space: pre;
+}
+.syntax-keyword { color: var(--purple); font-weight: 600; }
+.syntax-string { color: var(--green); }
+.syntax-number { color: var(--orange); }
+.syntax-comment { color: var(--muted); font-style: italic; }
+
+.processing-details {
+  margin-top: 5px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--tag-bg);
+  color: var(--muted);
+  font-size: 0.7em;
+  overflow: hidden;
+}
+.processing-details > summary {
+  padding: 6px 9px;
+  color: var(--muted);
+  user-select: none;
+}
+.processing-grid {
+  border-top: 1px solid var(--border);
+  padding: 5px 9px;
+}
+.processing-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 260px) minmax(0, 1fr);
+  gap: 12px;
+  padding: 2px 0;
+}
+.processing-row span:last-child {
+  color: var(--text);
+  text-align: left;
+}
+.processing-row span:first-child::after { content: ":"; }
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.compact-modal { max-width: 430px; }
+.admin-center-box {
+  width: min(1500px, calc(100vw - 40px));
+  max-width: none;
+  max-height: 94vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.admin-summary {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+}
+.admin-table-wrap { overflow-x: hidden; overflow-y: visible; }
+.admin-user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72em;
+  table-layout: fixed;
+}
+.admin-user-table th,
+.admin-user-table td {
+  padding: 7px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.admin-user-table input,
+.admin-user-table select {
+  width: 100%;
+  min-width: 0;
+  padding: 4px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-console-section {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+}
+.admin-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.admin-setting-row span { display: grid; gap: 3px; }
+.admin-setting-row small, .admin-help-text { color: var(--muted); }
+.admin-actions button {
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--tag-bg);
+  color: var(--text);
+  font-family: inherit;
+}
+.admin-audit-list {
+  max-height: 190px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  color: var(--muted);
+  font-size: 0.7em;
+  white-space: pre-wrap;
+}
+.status-online { color: var(--green); }
+.status-offline { color: var(--muted); }
+.status-disabled { color: var(--red); }
 
 /* ── Message actions ─────────────────────────────────────── */
 .msg-actions {
@@ -1290,41 +1637,57 @@ The greeting rendering and rotation functions in aetheraeon.js.
 .msg-meta {
   font-size: 0.63em;
   color: var(--muted);
-  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  width: max-content;
+  max-width: none;
+  white-space: nowrap;
+  margin: 3px 0;
   padding: 0 4px;
 }
 .msg-you .msg-meta {
   text-align: right;
+  margin-left: auto;
 }
 .tool-badge {
   display: inline-block;
   font-size: 0.6em;
   padding: 1px 6px;
   border-radius: 3px;
-  margin-left: 6px;
+  margin-left: 0;
   vertical-align: middle;
   background: var(--tag-bg);
   color: var(--muted);
   border: 1px solid var(--border);
 }
+.tool-chat { color: var(--router-chat); border-color: var(--router-chat); }
+.tool-web, .tool-web_search { color: var(--router-web); border-color: var(--router-web); }
+.tool-personality { color: var(--router-personality); border-color: var(--router-personality); }
 .tool-shell {
   color: var(--green);
   border-color: var(--green);
 }
 .tool-aider {
-  color: var(--purple);
-  border-color: var(--purple);
+  color: var(--router-code);
+  border-color: var(--router-code);
+}
+.tool-code {
+  color: var(--router-code);
+  border-color: var(--router-code);
 }
 .tool-memory,
 .tool-chromadb_store,
 .tool-chromadb_recall,
-.tool-memory_recall {
-  color: var(--orange);
-  border-color: var(--orange);
+.tool-memory_recall,
+.tool-memory_search {
+  color: var(--router-memory);
+  border-color: var(--router-memory);
 }
 .tool-system {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--router-system);
+  border-color: var(--router-system);
 }
 
 /* ── Process/debug details block ─────────────────────────── */
@@ -1354,7 +1717,7 @@ details.proc pre {
   font-style: italic;
 }
 .typing span {
-  animation: blink 1s infinite;
+  animation: blink 3.5s infinite;
 }
 @keyframes blink {
   0%,
@@ -1379,7 +1742,7 @@ details.proc pre {
   flex-shrink: 0;
 }
 .qbtn {
-  background: var(--tag-bg);
+  background: var(--button-bg);
   border: 1px solid var(--border);
   color: var(--muted);
   border-radius: 4px;
@@ -1391,7 +1754,7 @@ details.proc pre {
 .qbtn:hover {
   border-color: var(--accent);
   color: var(--accent);
-  background: var(--surface2);
+  background: var(--button-hover);
 }
 
 /* CSS-007: Input Area */
@@ -1407,10 +1770,45 @@ details.proc pre {
   align-items: flex-end;
   flex-shrink: 0;
 }
-#msg-input {
+#composer-input-wrap {
+  position: relative;
   flex: 1;
-  background: var(--bg);
+  min-width: 0;
+}
+#choice-composer-notice {
+  align-items: center;
+  background: var(--surface2);
   border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  display: flex;
+  font-size: 0.78em;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 7px 9px 7px 11px;
+}
+#choice-composer-notice[hidden] {
+  display: none;
+}
+#choice-composer-cancel {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text);
+  font: inherit;
+  padding: 3px 8px;
+}
+#choice-composer-cancel:hover,
+#choice-composer-cancel:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+#msg-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   color: var(--text);
   border-radius: 7px;
   padding: 9px 13px;
@@ -1422,6 +1820,56 @@ details.proc pre {
 }
 #msg-input:focus {
   border-color: var(--accent);
+}
+#slash-command-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 1000;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--menu-bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+#slash-command-menu[hidden] {
+  display: none;
+}
+.slash-command-item {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+}
+.slash-command-item:hover,
+.slash-command-item.active {
+  background: var(--menu-hover);
+}
+.slash-command-name {
+  min-width: 74px;
+  color: var(--accent);
+  font-weight: bold;
+}
+.slash-command-description {
+  color: var(--muted);
+  font-size: 0.85em;
+}
+.slash-command-parameter-hint {
+  flex-basis: 100%;
+  padding-left: 86px;
+  color: var(--muted);
+  font-size: 0.78em;
 }
 #send-btn {
   background: var(--accent);
@@ -1637,8 +2085,8 @@ to existing stable IDs and structural selectors.
 .modal-field input,
 .modal-field textarea,
 .modal-field select {
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   color: var(--text);
   border-radius: 6px;
   padding: 8px 11px;
@@ -1663,7 +2111,7 @@ to existing stable IDs and structural selectors.
   flex-wrap: wrap;
 }
 .modal-btn {
-  background: var(--tag-bg);
+  background: var(--button-bg);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 6px;
@@ -1695,11 +2143,199 @@ to existing stable IDs and structural selectors.
 
 /* Preserve the original per-dialog widths and playbook control sizing. */
 #settings-modal > .modal-box {
-  width: 500px;
+  width: min(900px, 94vw);
+}
+
+.processing-settings-group { border: 0; display: grid; gap: 8px; margin-top: 6px; }
+.processing-settings-group:disabled { opacity: 0.45; }
+.custom-theme-editor { display: grid; gap: 14px; }
+.theme-color-section { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.theme-color-section h4 { color: var(--accent); margin-bottom: 8px; }
+.theme-color-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.theme-color-field { display: grid; grid-template-columns: minmax(0, 1fr) 42px 72px; align-items: center; gap: 7px; }
+.theme-color-field input[type="color"] { width: 42px; height: 30px; border: 1px solid var(--border); background: transparent; }
+.theme-color-value { color: var(--muted); font-size: 0.72em; }
+@media (max-width: 760px) {
+  .theme-color-grid { grid-template-columns: 1fr; }
+  .processing-row { grid-template-columns: minmax(145px, 1fr) minmax(0, 1fr); }
+  .admin-center-box { width: calc(100vw - 16px); }
 }
 
 #personality-manager-modal > .modal-box {
   width: 480px;
+}
+
+#personality-manager-modal > .trait-manager-box {
+  width: min(780px, calc(100vw - 24px));
+  max-height: min(88vh, 900px);
+  overflow-y: auto;
+}
+
+#trait-editor-modal > .trait-editor-box {
+  width: min(620px, calc(100vw - 24px));
+  max-height: min(88vh, 780px);
+  overflow-y: auto;
+}
+
+.trait-editor-box .hidden,
+.trait-editor-box [hidden] {
+  display: none !important;
+}
+
+.trait-tabs,
+.trait-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trait-tabs {
+  margin: 12px 0 18px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.trait-tabs .active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.trait-list {
+  display: grid;
+  gap: 12px;
+  margin: 10px 0 18px;
+}
+
+.trait-panel.hidden {
+  display: none;
+}
+
+.trait-help {
+  color: var(--muted);
+  font-size: 0.8em;
+  margin-top: -4px;
+}
+
+.trait-candidate-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.trait-candidate-tabs .active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.trait-candidate-content,
+.trait-candidate-section,
+.trait-candidate-list {
+  overflow: visible;
+  max-height: none;
+}
+
+.trait-candidate-section.hidden,
+.trait-candidate-section[hidden] {
+  display: none;
+}
+
+.trait-candidate-heading {
+  color: var(--text);
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+
+.trait-candidate-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  align-items: start;
+}
+
+.trait-candidate-card-promoted {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--border));
+}
+
+.trait-candidate-card-promoted .trait-confidence-value {
+  color: var(--green);
+}
+
+.trait-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--panel);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+.trait-card h4 { margin: 0 0 8px; }
+
+.trait-card-details {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.trait-history-card[role="button"] {
+  cursor: pointer;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+}
+
+.trait-history-card[role="button"]:hover,
+.trait-history-card[role="button"]:focus-visible {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.trait-form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 0 12px;
+}
+
+.trait-description-field { grid-column: 1 / -1; }
+
+.trait-confidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 9px 0 12px;
+}
+
+.trait-confidence-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.trait-confidence-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  transition: width 0.2s ease;
+}
+
+.trait-confidence-value {
+  min-width: 42px;
+  color: var(--accent);
+  font-weight: 700;
+  text-align: right;
+}
+
+.trait-feedback-target {
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface2);
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .trait-form-grid { grid-template-columns: 1fr; }
+  .trait-description-field { grid-column: auto; }
 }
 
 #playbook-modal > .modal-box {
@@ -2233,6 +2869,287 @@ to existing stable IDs and structural selectors.
   .mem-tool-btn {
     padding: 6px 10px;
     font-size: 0.72em;
+  }
+}
+
+/* ============================================================
+   ADMIN CENTER DASHBOARD
+   Kept after shared modal/mobile rules so the generic 420px
+   dialog width can never constrain the management console.
+   ============================================================ */
+#admin-center-modal {
+  padding: 20px 24px;
+  overflow: hidden;
+}
+
+#admin-center-modal > .admin-center-box {
+  width: 90vw;
+  min-width: min(1260px, calc(100vw - 48px));
+  max-width: 1600px;
+  height: calc(100vh - 40px);
+  height: calc(100dvh - 40px);
+  max-height: 92vh;
+  padding: 0;
+  gap: 0;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.admin-center-header,
+.admin-center-footer {
+  flex: 0 0 auto;
+  padding: 18px 24px;
+  background: var(--surface);
+}
+
+.admin-center-header {
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-center-header .modal-title {
+  font-size: 1.1em;
+}
+
+.admin-center-subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.72em;
+}
+
+.admin-center-footer {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+}
+
+.admin-center-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 22px 24px 28px;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  background: var(--bg);
+}
+
+.admin-summary,
+.admin-dashboard-card,
+.admin-console-section {
+  width: 100%;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.admin-summary {
+  padding: 12px 16px;
+}
+
+.admin-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  min-width: 0;
+}
+
+.admin-console-section,
+.admin-dashboard-card {
+  padding: 18px;
+}
+
+.admin-section-heading {
+  margin-bottom: 14px;
+  color: var(--text);
+  font-size: 0.86em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.admin-setting-row {
+  align-items: center;
+  min-width: 0;
+}
+
+.admin-setting-row span,
+.admin-setting-row small,
+.admin-help-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-console-section .modal-btn.danger {
+  justify-self: start;
+  margin-top: 2px;
+}
+
+#deployment-mode-section.visible {
+  display: grid;
+  gap: 10px;
+}
+.deployment-mode-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 0.72em;
+  color: var(--muted);
+}
+.deployment-mode-summary span {
+  display: grid;
+  gap: 3px;
+}
+.deployment-mode-summary strong { color: var(--text); }
+#deployment-mode-select {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.deployment-restart-notice {
+  color: var(--orange);
+  font-size: 0.72em;
+  line-height: 1.4;
+}
+
+.admin-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.admin-user-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.78em;
+}
+
+.admin-user-table th:nth-child(1) { width: 16%; }
+.admin-user-table th:nth-child(2) { width: 16%; }
+.admin-user-table th:nth-child(3) { width: 8%; }
+.admin-user-table th:nth-child(4) { width: 8%; }
+.admin-user-table th:nth-child(5) { width: 12%; }
+.admin-user-table th:nth-child(6) { width: 12%; }
+.admin-user-table th:nth-child(7) { width: 28%; }
+
+.admin-user-table th,
+.admin-user-table td {
+  min-width: 0;
+  padding: 10px 8px;
+  overflow-wrap: anywhere;
+}
+
+.admin-user-table input,
+.admin-user-table select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.admin-user-table td:first-child input + input {
+  margin-top: 7px;
+}
+
+.admin-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-actions button {
+  min-width: 0;
+  width: 100%;
+  padding: 6px 8px;
+  white-space: normal;
+}
+
+.admin-audit-list {
+  max-height: none;
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  #admin-center-modal {
+    padding: 10px;
+  }
+
+  #admin-center-modal > .admin-center-box {
+    width: calc(100vw - 20px) !important;
+    min-width: 0;
+    height: calc(100dvh - 20px);
+    border-radius: 10px;
+  }
+
+  .admin-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-table,
+  .admin-user-table tbody {
+    display: block;
+  }
+
+  .admin-user-table thead {
+    display: none;
+  }
+
+  .admin-user-table tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 18px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .admin-user-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  .admin-user-table td::before {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--muted);
+    font-size: 0.78em;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .admin-user-table td:nth-child(1)::before { content: "Username / Name"; }
+  .admin-user-table td:nth-child(2)::before { content: "Email"; }
+  .admin-user-table td:nth-child(3)::before { content: "Role"; }
+  .admin-user-table td:nth-child(4)::before { content: "Status"; }
+  .admin-user-table td:nth-child(5)::before { content: "Last Activity"; }
+  .admin-user-table td:nth-child(6)::before { content: "Created"; }
+  .admin-user-table td:nth-child(7)::before { content: "Actions"; }
+  .admin-user-table td:nth-child(7) { grid-column: 1 / -1; }
+}
+
+@media (max-width: 620px) {
+  .admin-center-header,
+  .admin-center-footer,
+  .admin-center-content {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .admin-user-table tr {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-user-table td:nth-child(7) {
+    grid-column: auto;
   }
 }
 
@@ -2860,6 +3777,9 @@ to existing stable IDs and structural selectors.
 #mem-table th:nth-child(6) {
   width: 80px;
 } /* actions */
+#mem-table th:nth-child(7) {
+  width: 260px;
+} /* full ID */
 
 #mem-table td {
   border: 1px solid var(--border);
@@ -2957,9 +3877,34 @@ to existing stable IDs and structural selectors.
   font-size: 0.68em;
   color: var(--muted);
   font-family: "Consolas", monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+#mem-table td.mem-id-cell {
+  white-space: normal;
+}
+.mem-id-text {
+  display: block;
+  color: inherit;
+  font: inherit;
+  word-break: break-all;
+  user-select: text;
+}
+.mem-id-copy-btn {
+  margin-top: 5px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+}
+.mem-id-copy-btn:hover,
+.mem-id-copy-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Inline row action buttons */

@@ -1181,17 +1181,91 @@ JS-011 Event Handlers
 
 "use strict";
 
+function setConversationMenuOpen(menu, open) {
+  if (!menu) return;
+  menu.style.display = open ? "block" : "none";
+  const actions = menu.closest(".conv-actions, .pb-actions");
+  actions?.classList.toggle("menu-open", open);
+  actions?.querySelector(".conv-menu-btn")?.setAttribute(
+    "aria-expanded",
+    open ? "true" : "false",
+  );
+}
+
+function closeConversationMenus(selector = ".conv-dropdown-menu") {
+  let closed = false;
+  document.querySelectorAll(selector).forEach((menu) => {
+    if (menu.style.display === "block") closed = true;
+    setConversationMenuOpen(menu, false);
+  });
+  return closed;
+}
+
 // ── Global Escape: close any open modal / search / menu ─────
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  document.querySelectorAll(".modal-overlay.open").forEach((m) => m.classList.remove("open"));
-  if (document.getElementById("mem-edit-modal").classList.contains("open")) {
+
+  const memoryEditor = document.getElementById("mem-edit-modal");
+  if (memoryEditor?.classList.contains("open")) {
+    e.preventDefault();
+    e.stopPropagation();
     closeMemEdit();
     return;
   }
-  closeSearch();
-  closeUserMenu();
-  closeMemModal();
+  const topModal = getTopOpenModal();
+  if (topModal) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (topModal.id === "search-overlay") closeSearch();
+    else closeModal(topModal.id);
+    return;
+  }
+  const memoryManager = document.getElementById("mem-modal");
+  if (memoryManager?.classList.contains("open")) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeMemModal();
+    return;
+  }
+
+  const userMenu = document.getElementById("user-menu");
+  if (userMenu?.classList.contains("open")) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeUserMenu();
+    return;
+  }
+
+  if (slashCommandMenu && !slashCommandMenu.hidden) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeSlashCommandMenu();
+    return;
+  }
+
+  if (closeConversationMenus(".pb-actions .conv-dropdown-menu")) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  if (closeConversationMenus("#conv-list .conv-dropdown-menu")) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  const sidebar = document.getElementById("sidebar");
+  const sidebarVisible = sidebar && (
+    sidebar.classList.contains("open") ||
+    !sidebar.classList.contains("collapsed")
+  );
+  if (sidebarVisible) {
+    e.preventDefault();
+    e.stopPropagation();
+    closeSidebarDrawer();
+    return;
+  }
 });
 
 // JS-002: Global State
@@ -1207,8 +1281,11 @@ let _toastTimer = null;
 let _editingPbId = null; // null = new playbook, number = editing existing
 let _shareContent = "";
 let _searchTimer = null;
+let _searchCursor = null;
+let _searchQuery = "";
+let _searchRequestId = 0;
 let _statusTimer = null;
-let _backendAvailabilityTimer = null;
+let _sessionMonitorTimer = null;
 let _backendAvailable = false;
 let _greetingTimer = null;
 let _greetingPrefetchTimer = null;
@@ -1216,6 +1293,8 @@ let _greetingLoadingTimer = null;
 let _greetingCountdownTimer = null;
 let _greetingRequest = 0;
 let _greetingDeadline = 0;
+let _greetingAbortController = null;
+let _greetingOwnerConversationId = null;
 let _nextGreeting = null;
 let _activeGreetingText = "";
 let _greetingPersonalityStyle = "balanced";
@@ -1224,23 +1303,121 @@ const _greetingUiPools = new Map();
 // GREETING_COUNTDOWN_DEVELOPER_TOGGLE — set true to show the optional timer.
 const SHOW_GREETING_COUNTDOWN = true;
 const BACKEND_AVAILABILITY_INTERVAL_MS = 15000;
+const _inFlightJsonGets = new Map();
 let personalityTraits = [];
+let personalityTraitHistory = [];
+let personalityTraitCandidates = [];
+let activeCandidateSubTab = "active";
+let traitEditorState = null;
+const modalNavigationStack = [];
+let displayPreferences = {
+  show_processing_details: true,
+  processing_details_expanded: false,
+  processing_details_mode: "compact",
+  font_family: "mono",
+  font_size: 18,
+  chat_text_size: 16,
+  button_size: 16,
+  menu_size: 16,
+  header_size: 18,
+  code_size: 15,
+  text_style: "normal",
+  custom_text_color: "",
+  custom_chat_color: "",
+  custom_ui_color: "",
+  custom_accent_color: "",
+  custom_theme: {},
+};
+
+async function fetchJsonOnce(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  if (method !== "GET") {
+    const response = await fetch(url, options);
+    return { response, data: await response.json() };
+  }
+
+  const key = String(url);
+  if (!_inFlightJsonGets.has(key)) {
+    const request = (async () => {
+      const response = await fetch(url, options);
+      return { response, data: await response.json() };
+    })();
+    _inFlightJsonGets.set(key, request);
+    request.finally(() => {
+      if (_inFlightJsonGets.get(key) === request) _inFlightJsonGets.delete(key);
+    }).catch(() => {});
+  }
+  return _inFlightJsonGets.get(key);
+}
+
+const FONT_SIZE_OPTIONS = [12, 13, 14, 15, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40];
+const THEME_COLOR_SECTIONS = {
+  General: [["background", "Background", "--bg"], ["surface", "Surface / Panels", "--surface"], ["border", "Borders", "--border"], ["text", "Primary Text", "--text"], ["muted", "Secondary Text", "--muted"]],
+  Chat: [["chat_background", "Chat Background", "--chat-bg"], ["user_message", "User Message", "--you-bubble"], ["ai_message", "AI Message", "--ai-bubble"], ["code_background", "Code Background", "--code-bg"]],
+  Input: [["input_background", "Input Background", "--input-bg"], ["input_border", "Input Border", "--input-border"], ["placeholder", "Placeholder", "--placeholder"]],
+  Buttons: [["button", "Button", "--button-bg"], ["button_hover", "Hover", "--button-hover"], ["button_active", "Active", "--button-active"], ["button_disabled", "Disabled", "--button-disabled"]],
+  Navigation: [["sidebar", "Sidebar", "--sidebar-bg"], ["sidebar_hover", "Sidebar Hover", "--sidebar-hover"], ["menu", "Menu", "--menu-bg"], ["menu_hover", "Menu Hover", "--menu-hover"]],
+  Accent: [["accent", "Accent", "--accent"], ["success", "Success", "--green"], ["warning", "Warning", "--orange"], ["error", "Error", "--red"], ["info", "Info", "--info"]],
+  "Router Badge Colors": [["router_chat", "Chat", "--router-chat"], ["router_memory", "Memory", "--router-memory"], ["router_code", "Code", "--router-code"], ["router_personality", "Personality", "--router-personality"], ["router_web", "Web", "--router-web"], ["router_system", "System", "--router-system"]],
+};
+const THEME_COLOR_VARIABLES = Object.values(THEME_COLOR_SECTIONS).flat().map(([, , cssVar]) => cssVar);
+let customThemeDirty = false;
 
 // DOM shortcuts
 const chat = document.getElementById("chat");
 const input = document.getElementById("msg-input");
 const sendBtn = document.getElementById("send-btn");
+const slashCommandMenu = document.getElementById("slash-command-menu");
+const choiceComposerNotice = document.getElementById("choice-composer-notice");
+const choiceComposerCancel = document.getElementById("choice-composer-cancel");
+
+const SLASH_COMMAND_CATALOG = Object.freeze([
+  { command: "/help", description: "Show available commands" },
+  { command: "/status", description: "Show system health" },
+  { command: "/memory", description: "Manage memories" },
+  { command: "/model", description: "Manage AI models" },
+  { command: "/personality", description: "Manage AI traits" },
+  { command: "/memory list", description: "Show stored memories", parent: "/memory" },
+  {
+    command: "/memory search",
+    description: "Search memories",
+    parent: "/memory",
+    parameterHint: "Search text required",
+    example: "/memory search project notes",
+  },
+  {
+    command: "/memory delete",
+    description: "Delete a memory entry",
+    parent: "/memory",
+    parameterHint: "Memory ID required",
+    example: "/memory delete abc123",
+  },
+  { command: "/model show", description: "Show active AI models", parent: "/model" },
+  { command: "/model list", description: "List installed AI models", parent: "/model" },
+]);
+let slashCommandSelection = -1;
 
 // JS-010: Settings
 
 async function applyTheme(theme, persist = true) {
+  if (theme === "custom" && !Object.keys(displayPreferences.custom_theme || {}).length) {
+    displayPreferences.custom_theme = currentThemePalette();
+    renderCustomThemeEditor(displayPreferences.custom_theme);
+  }
   document.documentElement.setAttribute("data-theme", theme);
+  if (theme !== "custom") {
+    THEME_COLOR_VARIABLES.forEach((name) =>
+      document.documentElement.style.removeProperty(name),
+    );
+  } else {
+    applyCustomPalette(displayPreferences.custom_theme || {});
+  }
   // Update active theme button highlight
   document
     .querySelectorAll(".theme-btn")
     .forEach((b) => b.classList.toggle("active", b.dataset.theme === theme));
   if (persist && currentUser) {
-    await fetch("/api/settings", {
+    await fetch(apiUrl("settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ui_theme: theme }),
@@ -1248,14 +1425,128 @@ async function applyTheme(theme, persist = true) {
   }
 }
 
+function applyDisplayPreferences(settings = {}) {
+  displayPreferences = { ...displayPreferences, ...settings };
+  const root = document.documentElement;
+  const fonts = {
+    system: "system-ui, sans-serif",
+    sans: "Arial, Helvetica, sans-serif",
+    serif: "Georgia, 'Times New Roman', serif",
+    mono: "Consolas, 'Courier New', monospace",
+  };
+  root.style.setProperty("--app-font-family", fonts[displayPreferences.font_family] || fonts.system);
+  root.style.setProperty("--base-font-size", `${displayPreferences.font_size}px`);
+  root.style.setProperty("--chat-text-size", `${displayPreferences.chat_text_size}px`);
+  root.style.setProperty("--button-text-size", `${displayPreferences.button_size}px`);
+  root.style.setProperty("--menu-text-size", `${displayPreferences.menu_size}px`);
+  root.style.setProperty("--header-text-size", `${displayPreferences.header_size}px`);
+  root.style.setProperty("--code-text-size", `${displayPreferences.code_size}px`);
+  document.body.dataset.textStyle = displayPreferences.text_style || "normal";
+  if (settings.ui_theme === "custom") {
+    if (displayPreferences.custom_text_color) root.style.setProperty("--text", displayPreferences.custom_text_color);
+    if (displayPreferences.custom_chat_color) root.style.setProperty("--you-bubble", displayPreferences.custom_chat_color);
+    if (displayPreferences.custom_ui_color) root.style.setProperty("--surface", displayPreferences.custom_ui_color);
+    if (displayPreferences.custom_accent_color) root.style.setProperty("--accent", displayPreferences.custom_accent_color);
+    applyCustomPalette(displayPreferences.custom_theme || {});
+  }
+}
+
+function applyCustomPalette(palette = {}) {
+  Object.values(THEME_COLOR_SECTIONS).flat().forEach(([key, , cssVar]) => {
+    if (/^#[0-9a-f]{6}$/i.test(palette[key] || "")) document.documentElement.style.setProperty(cssVar, palette[key]);
+  });
+}
+
+function rgbToHex(color) {
+  const values = String(color).match(/\d+/g);
+  return values?.length >= 3 ? `#${values.slice(0, 3).map((n) => Number(n).toString(16).padStart(2, "0")).join("")}` : "#000000";
+}
+
+function resolvedThemeColor(cssVar) {
+  const probe = document.createElement("span");
+  probe.style.color = `var(${cssVar})`;
+  probe.style.display = "none";
+  document.body.appendChild(probe);
+  const value = rgbToHex(getComputedStyle(probe).color);
+  probe.remove();
+  return value;
+}
+
+function currentThemePalette() {
+  const palette = {};
+  Object.values(THEME_COLOR_SECTIONS).flat().forEach(([key, , cssVar]) => { palette[key] = resolvedThemeColor(cssVar); });
+  return palette;
+}
+
+function renderCustomThemeEditor(palette = {}) {
+  const editor = document.getElementById("custom-theme-editor");
+  if (!editor) return;
+  editor.replaceChildren();
+  const values = Object.keys(palette).length ? palette : currentThemePalette();
+  Object.entries(THEME_COLOR_SECTIONS).forEach(([sectionName, fields]) => {
+    const section = document.createElement("section");
+    section.className = "theme-color-section";
+    const heading = document.createElement("h4");
+    heading.textContent = sectionName;
+    const grid = document.createElement("div");
+    grid.className = "theme-color-grid";
+    fields.forEach(([key, label, cssVar]) => {
+      const field = document.createElement("label");
+      field.className = "theme-color-field";
+      const name = document.createElement("span");
+      name.textContent = label;
+      const picker = document.createElement("input");
+      picker.type = "color";
+      picker.dataset.themeColor = key;
+      picker.value = values[key] || resolvedThemeColor(cssVar);
+      const output = document.createElement("output");
+      output.className = "theme-color-value";
+      output.value = picker.value;
+      output.textContent = picker.value;
+      picker.addEventListener("input", () => {
+        output.value = picker.value;
+        output.textContent = picker.value;
+        displayPreferences.custom_theme = { ...currentThemePalette(), ...(displayPreferences.custom_theme || {}), [key]: picker.value };
+        customThemeDirty = true;
+        applyTheme("custom", false);
+      });
+      field.append(name, picker, output);
+      grid.appendChild(field);
+    });
+    section.append(heading, grid);
+    editor.appendChild(section);
+  });
+}
+
+function initializeFontSelects() {
+  document.querySelectorAll(".font-size-select").forEach((select) => {
+    if (!select.options.length) FONT_SIZE_OPTIONS.forEach((size) => select.add(new Option(`${size} px`, size)));
+  });
+}
+
+function resetFontSettings() {
+  const defaults = { "display-font-size": 18, "display-chat-size": 16, "display-menu-size": 16, "display-header-size": 18, "display-code-size": 15 };
+  Object.entries(defaults).forEach(([id, value]) => { document.getElementById(id).value = String(value); });
+  applyDisplayPreferences({ font_size: 18, chat_text_size: 16, button_size: 16, menu_size: 16, header_size: 18, code_size: 15 });
+}
+
+function syncProcessingSettingsState() {
+  const enabled = !!document.getElementById("show-processing-details")?.checked;
+  const group = document.getElementById("processing-dependent-settings");
+  if (group) group.disabled = !enabled;
+}
+
 async function loadTheme() {
   try {
-    const r = await fetch("/api/settings");
-    const d = await r.json();
+    const { data: d } = await fetchJsonOnce(apiUrl("settings"));
     if (d.ok && d.settings) {
       _greetingPersonalityStyle = d.settings.personality_style || "balanced";
+      await applyTheme(d.settings.ui_theme || "dark", false);
+      applyDisplayPreferences(d.settings);
+      renderCustomThemeEditor(d.settings.custom_theme || {});
+    } else {
+      await applyTheme("dark", false);
     }
-    applyTheme(d.ok ? d.settings.ui_theme || "dark" : "dark", false);
   } catch {
     applyTheme("dark", false);
   }
@@ -1267,6 +1558,7 @@ async function loadTheme() {
 // JS-004: Authentication
 
 let currentTab = "login";
+let passwordResetToken = "";
 
 // ------------------------------------------------------
 // Function: setBackendAvailability()
@@ -1290,32 +1582,77 @@ function setBackendAvailability(available) {
     return;
   }
 
-  submitButton.title = "Aetheraeon AI server is unavailable";
-  statusElement.textContent = "Aetheraeon AI server is currently offline. Please try again later.";
+  submitButton.title = "Aetheraeon Core is unavailable";
+  statusElement.textContent = "Aetheraeon Core Offline. The frontend remains available.";
   statusElement.classList.add("visible");
+}
+
+function setDeploymentHealth({ aiCore = false, database = null } = {}) {
+  const setState = (id, label, state) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.textContent = label;
+    element.classList.remove("online", "offline", "checking", "unknown");
+    element.classList.add(state);
+  };
+  setState("health-frontend", "Frontend Online", "online");
+  setState(
+    "health-ai-core",
+    aiCore ? "Aetheraeon Core Online" : "Aetheraeon Core Offline",
+    aiCore ? "online" : "offline",
+  );
+  setState(
+    "health-database",
+    database === true ? "Database Online" : database === false ? "Database Offline" : "Database Unknown",
+    database === true ? "online" : database === false ? "offline" : "unknown",
+  );
+}
+
+async function checkProductionDatabaseHealth() {
+  try {
+    const { response, data } = await fetchJsonOnce(apiUrl("db_health.php"), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (
+      !response.ok ||
+      !data ||
+      Object.keys(data).length !== 1 ||
+      (data.database !== "Online" && data.database !== "Offline")
+    ) {
+      return { production: false, database: null };
+    }
+    return { production: true, database: data.database === "Online" };
+  } catch {
+    return { production: false, database: null };
+  }
+}
+
+function deploymentBasePath() {
+  const match = String(window.location.pathname || "").match(/^\/Aetheraeon(?=\/|$)/i);
+  return match ? match[0] : "";
+}
+
+function isProductionDeployment() {
+  return deploymentBasePath() !== "";
+}
+
+function apiUrl(path = "") {
+  let normalized = String(path).trim().replace(/^\/+/, "");
+  if (normalized === "api") normalized = "";
+  if (normalized.startsWith("api/")) normalized = normalized.slice(4);
+  const apiBase = `${deploymentBasePath()}/api`;
+  return normalized ? `${apiBase}/${normalized}` : apiBase;
 }
 
 // ------------------------------------------------------
 // Function: checkBackendAvailability()
-// Purpose: Performs a lightweight reachability check against the existing status endpoint.
+// Purpose: Performs the deployment-appropriate lightweight reachability check.
 // Called by: startBackendAvailabilityMonitoring() and its recovery timer.
 // Updates: Login availability through setBackendAvailability().
 // ------------------------------------------------------
 async function checkBackendAvailability() {
-  let available = false;
-
-  try {
-    const response = await fetch("/api/status", {
-      cache: "no-store",
-      signal: AbortSignal.timeout(10000),
-    });
-    available = response.ok;
-  } catch {
-    available = false;
-  }
-
-  setBackendAvailability(available);
-  return available;
+  return refreshStatus();
 }
 
 // ------------------------------------------------------
@@ -1325,11 +1662,11 @@ async function checkBackendAvailability() {
 // Updates: Backend availability timer.
 // ------------------------------------------------------
 function startBackendAvailabilityMonitoring() {
-  checkBackendAvailability();
+  refreshStatus();
 
-  if (!_backendAvailabilityTimer) {
-    _backendAvailabilityTimer = setInterval(
-      checkBackendAvailability,
+  if (!_statusTimer) {
+    _statusTimer = setInterval(
+      refreshStatus,
       BACKEND_AVAILABILITY_INTERVAL_MS,
     );
   }
@@ -1340,8 +1677,13 @@ function switchTab(tab) {
   const isReg = tab === "register";
   document.getElementById("tab-login").classList.toggle("active", !isReg);
   document.getElementById("tab-register").classList.toggle("active", isReg);
-  document.getElementById("reg-fullname-field").style.display = isReg ? "" : "none";
-  document.getElementById("reg-username-field").style.display = isReg ? "" : "none";
+  document.getElementById("reg-fullname-field").style.display = isReg ? "flex" : "none";
+  document.getElementById("reg-username-field").style.display = isReg ? "flex" : "none";
+  const identifierInput = document.getElementById("auth-email");
+  document.querySelector('label[for="auth-email"]').textContent = isReg ? "EMAIL" : "USERNAME OR EMAIL";
+  identifierInput.type = isReg ? "email" : "text";
+  identifierInput.placeholder = isReg ? "user@example.com" : "username or user@example.com";
+  identifierInput.autocomplete = isReg ? "email" : "username";
   document.getElementById("auth-submit-btn").textContent = isReg ? "Create Account" : "Sign In";
   document.getElementById("login-switch-text").innerHTML = isReg
     ? "Have an account? <span onclick=\"switchTab('login')\">Sign in</span>"
@@ -1356,7 +1698,7 @@ function switchTab(tab) {
 // Updates: Authentication errors or the authenticated application shell.
 // ------------------------------------------------------
 async function submitAuth() {
-  const email = document.getElementById("auth-email").value.trim().toLowerCase();
+  const identifier = document.getElementById("auth-email").value.trim();
   const password = document.getElementById("auth-password").value;
   const errEl = document.getElementById("auth-err");
   errEl.textContent = "";
@@ -1366,12 +1708,8 @@ async function submitAuth() {
     return;
   }
 
-  if (!email || !password) {
-    errEl.textContent = "Email and password required.";
-    return;
-  }
-  if (!/\S+@\S+\.\S+/.test(email)) {
-    errEl.textContent = "Enter a valid email.";
+  if (!identifier || !password) {
+    errEl.textContent = "Username/email and password required.";
     return;
   }
   if (password.length < 4) {
@@ -1379,17 +1717,22 @@ async function submitAuth() {
     return;
   }
 
-  let endpoint = "/api/login";
-  let payload = { email, password };
+  let endpoint = apiUrl("login");
+  let payload = { identifier, password };
 
   if (currentTab === "register") {
+    const email = identifier.toLowerCase();
     const fullName = document.getElementById("auth-fullname").value.trim();
     const username = document.getElementById("auth-username").value.trim();
     if (!fullName || !username) {
       errEl.textContent = "Full name and username required.";
       return;
     }
-    endpoint = "/api/register";
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      errEl.textContent = "Enter a valid email.";
+      return;
+    }
+    endpoint = apiUrl("register");
     payload = { full_name: fullName, username, email, password };
   }
 
@@ -1404,7 +1747,7 @@ async function submitAuth() {
       errEl.textContent = data.error || "Authentication failed.";
       return;
     }
-    bootApp(data.user);
+    bootApp(data.user, data);
   } catch (e) {
     errEl.textContent = "Connection error: " + e.message;
   }
@@ -1412,23 +1755,102 @@ async function submitAuth() {
 
 async function checkSession() {
   try {
-    const r = await fetch("/api/session");
+    const r = await fetch(apiUrl("session"));
     const d = await r.json();
-    if (d.ok) bootApp(d.user);
+    if (d.ok) bootApp(d.user, d);
+    else if (d.code === "forced_logout") showForcedLogout(d.error);
   } catch {}
+}
+
+function openForgotPassword() {
+  passwordResetToken = "";
+  document.getElementById("password-reset-title").textContent = "Forgot Password";
+  document.getElementById("password-reset-description").textContent = "Enter your email to request a reset link.";
+  document.getElementById("reset-email-field").style.display = "flex";
+  document.getElementById("reset-password-field").style.display = "none";
+  document.getElementById("password-reset-submit").textContent = "Send Reset Link";
+  document.getElementById("password-reset-submit").onclick = requestPasswordReset;
+  document.getElementById("password-reset-error").textContent = "";
+  document.getElementById("password-reset-ok").textContent = "";
+  openModal("password-reset-modal");
+}
+
+async function requestPasswordReset() {
+  const email = document.getElementById("reset-email").value.trim().toLowerCase();
+  const errorElement = document.getElementById("password-reset-error");
+  const output = document.getElementById("password-reset-ok");
+  errorElement.textContent = "";
+  output.textContent = "";
+  try {
+    const response = await fetch(apiUrl("password/forgot"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await response.json();
+    output.textContent = data.message || "If an account exists, a reset email has been sent.";
+  } catch (error) {
+    errorElement.textContent = "Unable to submit the request.";
+  }
+}
+
+function openResetPassword(token) {
+  passwordResetToken = token;
+  document.getElementById("password-reset-title").textContent = "Create New Password";
+  document.getElementById("password-reset-description").textContent = "Choose a new password of at least 8 characters.";
+  document.getElementById("reset-email-field").style.display = "none";
+  document.getElementById("reset-password-field").style.display = "flex";
+  document.getElementById("password-reset-submit").textContent = "Update Password";
+  document.getElementById("password-reset-submit").onclick = completePasswordReset;
+  openModal("password-reset-modal");
+}
+
+async function completePasswordReset() {
+  const password = document.getElementById("reset-new-password").value;
+  const errorElement = document.getElementById("password-reset-error");
+  const output = document.getElementById("password-reset-ok");
+  errorElement.textContent = "";
+  output.textContent = "";
+  if (password.length < 8) {
+    errorElement.textContent = "Password must be at least 8 characters.";
+    return;
+  }
+  const response = await fetch(apiUrl("password/reset"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token: passwordResetToken, password }),
+  });
+  const data = await response.json();
+  if (!data.ok) {
+    errorElement.textContent = data.error || "Reset failed.";
+    return;
+  }
+  output.textContent = data.message;
+  history.replaceState({}, "", location.pathname);
+  passwordResetToken = "";
+}
+
+function closePasswordReset() {
+  closeModal("password-reset-modal");
+  if (passwordResetToken) history.replaceState({}, "", location.pathname);
+  passwordResetToken = "";
 }
 
 async function logout() {
   closeUserMenu();
-  await fetch("/api/logout", { method: "POST" }).catch(() => {});
+  await fetch(apiUrl("logout"), { method: "POST" }).catch(() => {});
   currentUser = null;
   personalityTraits = [];
+  personalityTraitCandidates = [];
+  personalityTraitHistory = [];
+  traitEditorState = null;
+  modalNavigationStack.length = 0;
   _greetingUiPools.clear();
   conversations = {};
   activeConvId = null;
-  if (_statusTimer) {
-    clearInterval(_statusTimer);
-    _statusTimer = null;
+  if (_sessionMonitorTimer) {
+    clearInterval(_sessionMonitorTimer);
+    _sessionMonitorTimer = null;
   }
   stopGreetingRotation();
   chat.innerHTML = "";
@@ -1440,6 +1862,29 @@ async function logout() {
     if (el) el.value = "";
   });
   document.getElementById("auth-err").textContent = "";
+}
+
+function showForcedLogout(message = "You have been signed out by an administrator.") {
+  currentUser = null;
+  conversations = {};
+  activeConvId = null;
+  if (_sessionMonitorTimer) clearInterval(_sessionMonitorTimer);
+  _sessionMonitorTimer = null;
+  stopGreetingRotation();
+  chat.innerHTML = "";
+  document.getElementById("app").style.display = "none";
+  document.getElementById("login-screen").style.display = "flex";
+  document.getElementById("auth-password").value = "";
+  document.getElementById("auth-err").textContent = message;
+}
+
+async function monitorSession() {
+  try {
+    const response = await fetch(apiUrl("session"), { cache: "no-store" });
+    const data = await response.json();
+    if (data.code === "forced_logout") showForcedLogout(data.error);
+    else if (data.ok) updateMaintenanceBanner(!!data.maintenance_mode, data);
+  } catch {}
 }
 
 // ── Enter key to submit auth ──────────────────────────────
@@ -1470,6 +1915,272 @@ function closeUserMenu() {
   document.getElementById("user-menu").classList.remove("open");
 }
 
+function hasAdministrativeRole(role) {
+  return role === "owner" || role === "admin";
+}
+
+async function openAdminCenter() {
+  closeUserMenu();
+  if (!hasAdministrativeRole(currentUser?.role)) return;
+  openModal("admin-center-modal");
+  document.getElementById("admin-center-error").textContent = "";
+  await Promise.all([
+    loadAdminUsers(), loadAdminAudit(), loadAdminDiagnostics(), loadDeploymentSettings(),
+  ]);
+}
+
+async function loadAdminUsers() {
+  const response = await fetch(apiUrl("admin/users"));
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || "Unable to load users");
+  const body = document.getElementById("admin-users-body");
+  body.replaceChildren();
+  data.users.forEach((user) => body.appendChild(buildAdminUserRow(user)));
+}
+
+function buildAdminUserRow(user) {
+  const row = document.createElement("tr");
+  row.dataset.userId = user.id;
+
+  const identity = document.createElement("td");
+  const username = document.createElement("input");
+  username.className = "admin-username";
+  username.value = user.username || "";
+  const fullName = document.createElement("input");
+  fullName.className = "admin-full-name";
+  fullName.value = user.full_name || "";
+  identity.append(username, fullName);
+
+  const emailCell = document.createElement("td");
+  const email = document.createElement("input");
+  email.className = "admin-email";
+  email.type = "email";
+  email.value = user.email || "";
+  emailCell.appendChild(email);
+
+  const roleCell = document.createElement("td");
+  const role = document.createElement("select");
+  role.className = "admin-role";
+  role.add(new Option("User", "user"));
+  role.add(new Option("Admin", "admin"));
+  if (user.role === "owner") {
+    role.add(new Option("Owner", "owner"));
+    role.disabled = true;
+  }
+  role.value = user.role || "user";
+  roleCell.appendChild(role);
+
+  const status = document.createElement("td");
+  status.className = user.is_active ? (user.is_online ? "status-online" : "status-offline") : "status-disabled";
+  status.textContent = user.is_active ? (user.is_online ? "Online" : "Offline") : "Disabled";
+
+  const activity = document.createElement("td");
+  activity.textContent = user.last_activity || user.last_login || "Never";
+  const created = document.createElement("td");
+  created.textContent = user.created_at || "—";
+
+  const actionsCell = document.createElement("td");
+  const actions = document.createElement("div");
+  actions.className = "admin-actions";
+  const actionDefinitions = [
+    ["Save", () => adminSaveUser(user.id, row)],
+    ["View", () => enterAdminView(user.id)],
+    ["Reset Password", () => adminUserAction(user.id, "reset_password")],
+    [user.is_active ? "Disable" : "Enable", () => adminSetActive(user.id, !user.is_active)],
+    ["Delete", () => adminDeleteUser(user.id, user.username)],
+  ];
+  actionDefinitions.forEach(([label, handler]) => {
+    const button = document.createElement("button");
+    button.textContent = label;
+    button.onclick = handler;
+    actions.appendChild(button);
+  });
+  actionsCell.appendChild(actions);
+  row.append(identity, emailCell, roleCell, status, activity, created, actionsCell);
+  return row;
+}
+
+async function adminSaveUser(userId, row) {
+  const changes = {
+    username: row.querySelector(".admin-username").value.trim(),
+    full_name: row.querySelector(".admin-full-name").value.trim(),
+    email: row.querySelector(".admin-email").value.trim(),
+  };
+  const selectedRole = row.querySelector(".admin-role").value;
+  if (selectedRole !== "owner") changes.role = selectedRole;
+  await adminUserAction(userId, "update", changes);
+}
+
+async function adminSetActive(userId, enabled) {
+  if (!confirm(`${enabled ? "Enable" : "Disable"} this account?`)) return;
+  await adminUserAction(userId, "update", { is_active: enabled });
+}
+
+async function adminDeleteUser(userId, username) {
+  await adminUserAction(userId, "delete");
+}
+
+async function adminUserAction(userId, action, changes = {}) {
+  const errorElement = document.getElementById("admin-center-error");
+  errorElement.textContent = "";
+  try {
+    const response = await fetch(apiUrl(`admin/users/${userId}`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...changes }),
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Admin action failed");
+    showToast(data.message || "Admin action completed");
+    await Promise.all([loadAdminUsers(), loadAdminAudit()]);
+  } catch (error) {
+    errorElement.textContent = error.message;
+  }
+}
+
+async function loadAdminAudit() {
+  const response = await fetch(apiUrl("admin/audit?limit=100"));
+  const data = await response.json();
+  const list = document.getElementById("admin-audit-list");
+  if (!data.ok) {
+    list.textContent = data.error || "Audit log unavailable";
+    return;
+  }
+  list.textContent = data.logs.map((entry) =>
+    `${entry.created_at} — ${entry.admin_username || "deleted admin"} ${entry.action} ${entry.target_username || ""}${entry.details ? ` — ${entry.details}` : ""}`,
+  ).join("\n") || "No audit entries.";
+}
+
+async function loadAdminDiagnostics() {
+  const response = await fetch(apiUrl("admin/diagnostics"));
+  const data = await response.json();
+  document.getElementById("admin-diagnostics").textContent = data.ok
+    ? `Version ${data.version} · ${data.active_admins} active admin(s) · Services: ${Object.keys(data.services || {}).join(", ") || "none"}`
+    : data.error || "Diagnostics unavailable";
+  if (data.ok) {
+    document.getElementById("maintenance-mode-toggle").checked = !!data.maintenance_mode;
+    updateMaintenanceBanner(!!data.maintenance_mode, { administrator: currentUser });
+  }
+}
+
+function renderDeploymentSettings(data) {
+  if (!data?.ok) return;
+  const current = document.getElementById("deployment-current-mode");
+  const configured = document.getElementById("deployment-configured-mode");
+  const select = document.getElementById("deployment-mode-select");
+  const notice = document.getElementById("deployment-restart-notice");
+  if (current) current.textContent = titleCaseProcessingValue(data.current_mode);
+  if (configured) configured.textContent = titleCaseProcessingValue(data.configured_mode);
+  if (select) select.value = data.configured_mode || "development";
+  if (notice) notice.hidden = !data.restart_required;
+}
+
+async function loadDeploymentSettings() {
+  const response = await fetch(apiUrl("admin/deployment"), { cache: "no-store" });
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.error || "Deployment settings unavailable");
+  renderDeploymentSettings(data);
+}
+
+async function saveDeploymentMode() {
+  if (!hasAdministrativeRole(currentUser?.role)) return;
+  const select = document.getElementById("deployment-mode-select");
+  const button = document.getElementById("deployment-mode-save");
+  const mode = select?.value;
+  const confirmed = confirm(
+    `Configure ${titleCaseProcessingValue(mode)} deployment mode? Runtime behavior will not change until Aetheraeon is restarted.`,
+  );
+  if (!confirmed) return;
+  button.disabled = true;
+  try {
+    const response = await fetch(apiUrl("admin/deployment"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, confirmed: true }),
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to save deployment mode");
+    renderDeploymentSettings(data);
+    showToast(data.message || "Deployment configuration saved. Restart required.");
+    await loadAdminAudit();
+  } catch (error) {
+    document.getElementById("admin-center-error").textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function updateMaintenanceBanner(enabled, sessionData = {}) {
+  const actorIsAdmin = hasAdministrativeRole(currentUser?.role) ||
+    hasAdministrativeRole(sessionData.administrator?.role);
+  document.getElementById("maintenance-banner")?.classList.toggle("visible", !!enabled && actorIsAdmin);
+}
+
+async function setMaintenanceMode(enabled) {
+  const toggle = document.getElementById("maintenance-mode-toggle");
+  toggle.disabled = true;
+  try {
+    const response = await fetch(apiUrl("admin/system-settings"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ maintenance_mode: enabled }),
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Unable to update Maintenance Mode");
+    toggle.checked = !!data.maintenance_mode;
+    updateMaintenanceBanner(!!data.maintenance_mode, { administrator: currentUser });
+    showToast(`Maintenance Mode ${data.maintenance_mode ? "enabled" : "disabled"}`);
+    await loadAdminAudit();
+  } catch (error) {
+    toggle.checked = !enabled;
+    document.getElementById("admin-center-error").textContent = error.message;
+  } finally {
+    toggle.disabled = false;
+  }
+}
+
+async function forceLogoutAllUsers() {
+  if (!confirm("This will immediately sign out all connected users.")) return;
+  const keepCurrent = document.getElementById("keep-admin-session").checked;
+  const response = await fetch(apiUrl("admin/sessions/force-logout"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keep_current_session: keepCurrent }),
+  });
+  const data = await response.json();
+  if (!data.ok) {
+    document.getElementById("admin-center-error").textContent = data.error || "Unable to invalidate sessions";
+    return;
+  }
+  if (!keepCurrent) {
+    showForcedLogout();
+    return;
+  }
+  showToast(data.message || "All active sessions have been invalidated.");
+  await loadAdminAudit();
+}
+
+async function enterAdminView(userId) {
+  const response = await fetch(apiUrl("admin/view-user"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const data = await response.json();
+  if (!data.ok) {
+    document.getElementById("admin-center-error").textContent = data.error || "Unable to enter view";
+    return;
+  }
+  window.location.reload();
+}
+
+async function exitAdminView() {
+  const response = await fetch(apiUrl("admin/view-user/exit"), { method: "POST" });
+  const data = await response.json();
+  if (data.ok) window.location.reload();
+  else showToast(data.error || "Unable to exit administrator view", "var(--red)");
+}
+
 document.addEventListener("click", (e) => {
   if (!document.getElementById("user-menu").contains(e.target)) closeUserMenu();
 });
@@ -1480,10 +2191,10 @@ document.addEventListener("click", (e) => {
 
 function openSettings(panel = "themes") {
   closeUserMenu();
+  initializeFontSelects();
   loadSettingsData();
   switchSettingsTab(panel);
   openModal("settings-modal");
-  loadWebSearchToggle();
 }
 
 function switchSettingsTab(panel) {
@@ -1505,12 +2216,12 @@ async function loadSettingsData() {
   document.getElementById("current-pw-input").value = "";
   document.getElementById("new-pw-input").value = "";
   try {
-    const [settingsResponse, modelsResponse] = await Promise.all([
-      fetch("/api/settings"),
-      fetch("/api/models/installed"),
+    const [settingsResult, modelsResult] = await Promise.all([
+      fetchJsonOnce(apiUrl("settings")),
+      fetchJsonOnce(apiUrl("models/installed")),
     ]);
-    const settingsData = await settingsResponse.json();
-    const modelsData = await modelsResponse.json();
+    const settingsData = settingsResult.data;
+    const modelsData = modelsResult.data;
     if (!settingsData.ok || !settingsData.settings) return;
 
     const s = settingsData.settings;
@@ -1524,6 +2235,20 @@ async function loadSettingsData() {
     document.getElementById("response-detail").value = s.response_detail || "normal";
     document.getElementById("humor-level").value = s.humor_level || "low";
     document.getElementById("greeting-style").value = s.greeting_style || "friendly";
+    document.getElementById("display-font-family").value = s.font_family || "mono";
+    document.getElementById("display-text-style").value = s.text_style || "normal";
+    document.getElementById("display-font-size").value = s.font_size || 18;
+    document.getElementById("display-chat-size").value = s.chat_text_size || 16;
+    document.getElementById("display-menu-size").value = s.menu_size || 16;
+    document.getElementById("display-header-size").value = s.header_size || 18;
+    document.getElementById("display-code-size").value = s.code_size || 15;
+    document.getElementById("show-processing-details").checked = !!s.show_processing_details;
+    document.getElementById("processing-expanded").checked = !!s.processing_details_expanded;
+    document.getElementById("processing-mode").value = s.processing_details_mode || "compact";
+    syncProcessingSettingsState();
+    renderCustomThemeEditor(s.custom_theme || {});
+    customThemeDirty = false;
+    applyDisplayPreferences(s);
     await loadPersonalityTraits();
   } catch {}
 }
@@ -1560,7 +2285,7 @@ async function saveProfile() {
     return;
   }
   try {
-    const r = await fetch("/api/account/username", {
+    const r = await fetch(apiUrl("account/username"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1606,7 +2331,7 @@ async function saveAccount() {
     return;
   }
   try {
-    const r = await fetch("/api/account/password", {
+    const r = await fetch(apiUrl("account/password"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, current_password: curPw, new_password: newPw }),
@@ -1636,10 +2361,8 @@ async function deleteAccount() {
     errEl.textContent = "Enter your password to confirm.";
     return;
   }
-  if (!confirm("This will permanently delete your account and ALL data. Are you absolutely sure?"))
-    return;
   try {
-    const r = await fetch("/api/account/delete", {
+    const r = await fetch(apiUrl("account/delete"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: pw }),
@@ -1674,7 +2397,7 @@ async function saveModelSettings() {
     return;
   }
   try {
-    const r = await fetch("/api/settings", {
+    const r = await fetch(apiUrl("settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
@@ -1683,6 +2406,44 @@ async function saveModelSettings() {
     okEl.textContent = d.ok ? "✅ Models saved!" : d.error || "Failed to save models.";
   } catch (e) {
     okEl.textContent = "Error: " + e.message;
+  }
+}
+
+async function saveDisplaySettings() {
+  const output = document.getElementById("display-settings-ok");
+  output.textContent = "";
+  const customTheme = {};
+  document.querySelectorAll("[data-theme-color]").forEach((picker) => { customTheme[picker.dataset.themeColor] = picker.value; });
+  const selectedTheme = document.documentElement.getAttribute("data-theme") || "dark";
+  const settings = {
+    ui_theme: customThemeDirty ? "custom" : selectedTheme,
+    font_family: document.getElementById("display-font-family").value,
+    text_style: document.getElementById("display-text-style").value,
+    font_size: Number(document.getElementById("display-font-size").value),
+    chat_text_size: Number(document.getElementById("display-chat-size").value),
+    button_size: Number(document.getElementById("display-menu-size").value),
+    menu_size: Number(document.getElementById("display-menu-size").value),
+    header_size: Number(document.getElementById("display-header-size").value),
+    code_size: Number(document.getElementById("display-code-size").value),
+    custom_theme: customTheme,
+    show_processing_details: document.getElementById("show-processing-details").checked ? 1 : 0,
+    processing_details_expanded: document.getElementById("processing-expanded").checked ? 1 : 0,
+    processing_details_mode: document.getElementById("processing-mode").value,
+  };
+  try {
+    const response = await fetch(apiUrl("settings"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings),
+    });
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "Save failed");
+    applyTheme(data.settings.ui_theme || settings.ui_theme, false);
+    applyDisplayPreferences(data.settings);
+    customThemeDirty = false;
+    output.textContent = "Theme and display settings saved.";
+  } catch (error) {
+    output.textContent = error.message;
   }
 }
 
@@ -1699,7 +2460,7 @@ async function savePersonalitySettings() {
     greeting_style: document.getElementById("greeting-style").value,
   };
   try {
-    const r = await fetch("/api/settings", {
+    const r = await fetch(apiUrl("settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
@@ -1716,70 +2477,426 @@ async function savePersonalitySettings() {
 }
 
 async function loadPersonalityTraits() {
-  const r = await fetch("/api/personality/traits");
-  const d = await r.json();
+  const { data: d } = await fetchJsonOnce(apiUrl("personality/traits"));
   personalityTraits = d.ok ? d.traits : [];
+  personalityTraitCandidates = d.ok ? (d.aetheraeon_trait_candidates || []) : [];
   renderPersonalityTraits();
+}
+
+const traitStrengthLabels = {
+  1: "Very Weak", 2: "Weak", 3: "Mild", 4: "Moderate", 5: "Balanced",
+  6: "Noticeable", 7: "Strong", 8: "Very Strong", 9: "Dominant",
+  10: "Core Trait",
+};
+
+const traitCategoryOptions = [
+  "communication", "conversation", "teaching", "reasoning", "humor",
+  "greeting", "technical", "creativity", "personality", "memory",
+];
+
+function traitStrengthLevel(item) {
+  const level = Number(item?.strength_level || Math.round(Number(item?.strength || 0) / 10));
+  return Math.max(1, Math.min(10, level || 1));
+}
+
+function traitStrengthDisplay(item) {
+  const level = traitStrengthLevel(item);
+  return `${level} - ${item?.strength_label || traitStrengthLabels[level]}`;
+}
+
+function traitDetail(label, value) {
+  const line = document.createElement("div");
+  const key = document.createElement("strong");
+  key.textContent = label + ": ";
+  line.append(key, document.createTextNode(value ?? "Not provided"));
+  return line;
+}
+
+function traitCreatedDisplay(item) {
+  return item?.created_at ? new Date(item.created_at).toLocaleString() : "Unknown";
+}
+
+function traitSourceDisplay(item) {
+  if (item?.owner === "aetheraeon") {
+    return item.created_by === "system" ? "System Default" : "Aetheraeon Evolution";
+  }
+  return item?.created_by === "aetheraeon" ? "AI suggestion approved by user" : "User";
+}
+
+function traitConfidenceBar(value) {
+  const confidence = Math.max(0, Math.min(100, Number(value) || 0));
+  const wrapper = document.createElement("div");
+  wrapper.className = "trait-confidence";
+  const track = document.createElement("div");
+  track.className = "trait-confidence-track";
+  track.setAttribute("role", "progressbar");
+  track.setAttribute("aria-label", "Candidate confidence");
+  track.setAttribute("aria-valuemin", "0");
+  track.setAttribute("aria-valuemax", "100");
+  track.setAttribute("aria-valuenow", String(confidence));
+  const fill = document.createElement("div");
+  fill.className = "trait-confidence-fill";
+  fill.style.width = `${confidence}%`;
+  const output = document.createElement("span");
+  output.className = "trait-confidence-value";
+  output.textContent = `${confidence}%`;
+  track.appendChild(fill);
+  wrapper.append(track, output);
+  return wrapper;
+}
+
+function traitAction(label, handler, danger = false) {
+  const button = document.createElement("button");
+  button.className = `modal-btn${danger ? " danger" : ""}`;
+  button.textContent = label;
+  button.onclick = handler;
+  return button;
 }
 
 function renderPersonalityTraits() {
   const preview = document.getElementById("personality-traits-preview");
   preview.textContent = personalityTraits.length
-    ? personalityTraits.map((item) => item.trait).join(", ")
-    : "No custom traits.";
+    ? personalityTraits.map((item) => item.name || item.trait).join(", ")
+    : "No structured traits.";
 
-  const list = document.getElementById("personality-traits-list");
-  list.innerHTML = "";
-  if (!personalityTraits.length) {
-    list.textContent = "No custom traits yet.";
-    return;
+  const userList = document.getElementById("user-personality-traits-list");
+  const aiList = document.getElementById("aetheraeon-personality-traits-list");
+  const candidateList = document.getElementById("aetheraeon-trait-candidates-list");
+  const promotedCandidateList = document.getElementById("aetheraeon-promoted-candidates-list");
+  if (!userList || !aiList || !candidateList || !promotedCandidateList) return;
+  userList.replaceChildren();
+  aiList.replaceChildren();
+  candidateList.replaceChildren();
+  promotedCandidateList.replaceChildren();
+
+  const userTraits = personalityTraits.filter((item) => item.owner === "user");
+  const aiTraits = personalityTraits.filter((item) => item.owner === "aetheraeon");
+  if (!userTraits.length) userList.textContent = "No user traits yet.";
+  if (!aiTraits.length) aiList.textContent = "No Aetheraeon traits yet.";
+
+  userTraits.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "trait-card";
+    const title = document.createElement("h4");
+    title.textContent = item.name || item.trait;
+    const details = document.createElement("div");
+    details.className = "trait-card-details";
+    details.append(
+      traitDetail("Description", item.description),
+      traitDetail("Category", item.category),
+      traitDetail("Strength", traitStrengthDisplay(item)),
+      traitDetail("Created", traitCreatedDisplay(item)),
+      traitDetail("Source", traitSourceDisplay(item)),
+    );
+    const actions = document.createElement("div");
+    actions.className = "trait-card-actions";
+    actions.append(
+      traitAction("Edit", () => editPersonalityTrait(item)),
+      traitAction("Delete", () => removePersonalityTrait(item.id), true),
+    );
+    card.append(title, details, actions);
+    userList.appendChild(card);
+  });
+
+  aiTraits.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "trait-card";
+    const title = document.createElement("h4");
+    title.textContent = item.name || item.trait;
+    const details = document.createElement("div");
+    details.className = "trait-card-details";
+    details.append(
+      traitDetail("Description", item.description),
+      traitDetail("Category", item.category),
+      traitDetail("Strength", traitStrengthDisplay(item)),
+      traitDetail("Created", item.created_at ? new Date(item.created_at).toLocaleString() : "Unknown"),
+      traitDetail("Why it exists", item.reason_created),
+      traitDetail("Influenced by", item.influence_summary),
+    );
+    const latestFeedback = String(item.latest_feedback?.correction || "").trim();
+    if (latestFeedback) {
+      details.append(traitDetail("Latest User Feedback", `“${latestFeedback}”`));
+    }
+    const actions = document.createElement("div");
+    actions.className = "trait-card-actions";
+    actions.append(
+      traitAction("Correct this trait", () => correctPersonalityTrait(item)),
+      traitAction("Remove", () => removePersonalityTrait(item.id), true),
+    );
+    card.append(title, details, actions);
+    aiList.appendChild(card);
+  });
+
+  const activeCandidates = personalityTraitCandidates.filter(
+    (item) => item.status !== "promoted",
+  );
+  const promotedCandidates = personalityTraitCandidates.filter(
+    (item) => item.status === "promoted",
+  );
+  if (!activeCandidates.length) candidateList.textContent = "No active candidates.";
+  if (!promotedCandidates.length) {
+    promotedCandidateList.textContent = "No candidates have been promoted yet.";
   }
-  personalityTraits.forEach((item) => {
-    const row = document.createElement("div");
-    row.style.cssText =
-      "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px;border:1px solid var(--border);border-radius:6px";
-    const text = document.createElement("span");
-    text.textContent = item.trait;
-    const button = document.createElement("button");
-    button.className = "modal-btn danger";
-    button.textContent = "Remove";
-    button.onclick = () => removePersonalityTrait(item.id);
-    row.append(text, button);
-    list.appendChild(row);
+
+  const renderCandidateCard = (item, promoted = false) => {
+      const card = document.createElement("article");
+      card.className = `trait-card trait-candidate-card${promoted ? " trait-candidate-card-promoted" : ""}`;
+      const title = document.createElement("h4");
+      title.textContent = item.name;
+      const events = Array.isArray(item.influencing_events) ? item.influencing_events : [];
+      card.append(
+        title,
+        traitDetail("Description", item.description),
+        traitDetail("Category", item.category),
+        traitConfidenceBar(promoted ? 100 : item.confidence_score),
+        traitDetail("Evidence", `${Number(item.evidence_count || 0)} interactions`),
+        traitDetail("First detected", item.first_detected_at ? new Date(item.first_detected_at).toLocaleString() : "Unknown"),
+        traitDetail("Last detected", item.last_detected_at ? new Date(item.last_detected_at).toLocaleString() : "Unknown"),
+        traitDetail("Reason", item.reason_detected),
+        traitDetail("Status", promoted ? "Promoted to Aetheraeon Trait" : "Observing"),
+        ...(promoted
+          ? [
+              traitDetail("Created trait", item.promoted_trait_name || "Unknown"),
+              traitDetail("Promotion date", item.promoted_at ? new Date(item.promoted_at).toLocaleString() : "Unknown"),
+            ]
+          : []),
+        traitDetail("Influencing events", events.map((event) => event.summary).join("; ") || "Not provided"),
+      );
+      return card;
+  };
+
+  activeCandidates.forEach((item) => candidateList.appendChild(renderCandidateCard(item)));
+  promotedCandidates.forEach((item) => {
+    promotedCandidateList.appendChild(renderCandidateCard(item, true));
+  });
+  showCandidateSubTab(activeCandidateSubTab);
+}
+
+function showCandidateSubTab(tab = "active") {
+  const selectedTab = tab === "promoted" ? "promoted" : "active";
+  activeCandidateSubTab = selectedTab;
+  ["active", "promoted"].forEach((name) => {
+    const selected = name === selectedTab;
+    const panel = document.getElementById(`${name}-candidates-panel`);
+    const button = document.getElementById(`${name}-candidates-tab`);
+    panel?.classList.toggle("hidden", !selected);
+    if (panel) {
+      panel.hidden = !selected;
+      panel.setAttribute("aria-hidden", selected ? "false" : "true");
+    }
+    button?.classList.toggle("active", selected);
+    button?.setAttribute("aria-selected", selected ? "true" : "false");
   });
 }
 
 async function openPersonalityManager() {
   await loadPersonalityTraits();
   document.getElementById("trait-manager-err").textContent = "";
+  showTraitTab("user");
   openModal("personality-manager-modal");
 }
 
-async function addPersonalityTrait() {
-  const input = document.getElementById("new-personality-trait");
-  const errEl = document.getElementById("trait-manager-err");
-  const trait = input.value.trim();
-  errEl.textContent = "";
-  if (!trait) {
-    errEl.textContent = "Enter a trait.";
-    return;
-  }
-  const r = await fetch("/api/personality/traits", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ trait }),
+async function showTraitTab(tab) {
+  ["user", "aetheraeon", "candidates", "history"].forEach((name) => {
+    const panelId = name === "history"
+      ? "trait-history-panel"
+      : name === "candidates" ? "trait-candidates-panel" : `${name}-traits-panel`;
+    const tabId = name === "history"
+      ? "trait-history-tab"
+      : name === "candidates" ? "trait-candidates-tab" : `${name}-traits-tab`;
+    const panel = document.getElementById(panelId);
+    panel?.classList.toggle("hidden", name !== tab);
+    if (panel) {
+      panel.hidden = name !== tab;
+      panel.setAttribute("aria-hidden", name === tab ? "false" : "true");
+    }
+    document.getElementById(tabId)?.classList.toggle("active", name === tab);
   });
-  const d = await r.json();
-  if (!d.ok) {
-    errEl.textContent = d.error || "Failed.";
+  if (tab === "candidates") showCandidateSubTab(activeCandidateSubTab);
+  if (tab === "history") await loadPersonalityTraitHistory();
+}
+
+function openTraitEditor(mode, item = null) {
+  const feedbackMode = mode === "feedback";
+  const rawCategory = String(item?.category || "communication").trim();
+  const category = rawCategory.toLowerCase();
+  const standardCategory = traitCategoryOptions.includes(category);
+  traitEditorState = {
+    mode,
+    item,
+    initial: feedbackMode ? {
+      correction: String(item?.latest_feedback?.correction || ""),
+    } : {
+      name: item?.name || item?.trait || "",
+      description: item?.description || "",
+      category: standardCategory ? category : "other",
+      customCategory: standardCategory ? "" : rawCategory,
+      strength: item ? traitStrengthLevel(item) : 5,
+    },
+  };
+  document.getElementById("trait-editor-title").textContent = feedbackMode
+    ? "Correct Aetheraeon Trait"
+    : mode === "edit" ? "Edit User Trait" : "Add User Trait";
+  document.getElementById("trait-editor-fields").hidden = feedbackMode;
+  document.getElementById("trait-editor-fields").classList.toggle("hidden", feedbackMode);
+  document.getElementById("trait-feedback-fields").hidden = !feedbackMode;
+  document.getElementById("trait-feedback-fields").classList.toggle("hidden", !feedbackMode);
+  document.getElementById("trait-feedback-target").textContent = feedbackMode
+    ? `${item?.name || item?.trait}: ${item?.description || "No description provided."}`
+    : "";
+  document.getElementById("trait-editor-error").textContent = "";
+  resetTraitEditorModal();
+  openModal("trait-editor-modal");
+  setTimeout(() => document.getElementById(
+    feedbackMode ? "trait-feedback-correction" : "trait-editor-name",
+  )?.focus(), 0);
+}
+
+function resetTraitEditorModal() {
+  if (!traitEditorState) return;
+  const initial = traitEditorState.initial;
+  document.getElementById("trait-editor-error").textContent = "";
+  if (traitEditorState.mode === "feedback") {
+    document.getElementById("trait-feedback-correction").value = initial.correction;
     return;
   }
-  input.value = "";
-  await loadPersonalityTraits();
+  document.getElementById("trait-editor-name").value = initial.name;
+  document.getElementById("trait-editor-description").value = initial.description;
+  document.getElementById("trait-editor-category").value = initial.category;
+  document.getElementById("trait-editor-custom-category").value = initial.customCategory;
+  document.getElementById("trait-editor-strength").value = String(initial.strength);
+  syncTraitCategoryCustom();
+}
+
+function syncTraitCategoryCustom() {
+  const custom = document.getElementById("trait-editor-category").value === "other";
+  const wrapper = document.getElementById("trait-editor-custom-category-wrap");
+  wrapper.hidden = !custom;
+  wrapper.classList.toggle("hidden", !custom);
+}
+
+async function saveTraitEditorModal() {
+  if (!traitEditorState) return;
+  const err = document.getElementById("trait-editor-error");
+  err.textContent = "";
+  let endpoint = apiUrl("personality/traits");
+  let method = traitEditorState.mode === "edit" ? "PUT" : "POST";
+  let payload;
+  if (traitEditorState.mode === "feedback") {
+    const correction = document.getElementById("trait-feedback-correction").value.trim();
+    if (!correction) {
+      err.textContent = "Enter correction feedback.";
+      return;
+    }
+    endpoint = apiUrl("personality/traits/correct");
+    payload = { id: traitEditorState.item.id, correction };
+  } else {
+    const name = document.getElementById("trait-editor-name").value.trim();
+    const selectedCategory = document.getElementById("trait-editor-category").value;
+    const category = selectedCategory === "other"
+      ? document.getElementById("trait-editor-custom-category").value.trim()
+      : selectedCategory;
+    if (!name) {
+      err.textContent = "Enter a trait name.";
+      return;
+    }
+    if (!category) {
+      err.textContent = "Enter a custom category.";
+      return;
+    }
+    payload = {
+      ...(traitEditorState.mode === "edit" ? { id: traitEditorState.item.id } : {}),
+      name,
+      description: document.getElementById("trait-editor-description").value.trim(),
+      category,
+      strength_level: Number(document.getElementById("trait-editor-strength").value),
+    };
+  }
+  try {
+    const response = await fetch(endpoint, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!data.ok) {
+      err.textContent = data.error || "Unable to save trait.";
+      return;
+    }
+    closeModal("trait-editor-modal");
+    await loadPersonalityTraits();
+    if (traitEditorState.mode === "feedback") showToast("Trait correction saved.");
+    traitEditorState = null;
+  } catch (error) {
+    err.textContent = `Error: ${error.message}`;
+  }
+}
+
+function addPersonalityTrait() { openTraitEditor("create"); }
+function editPersonalityTrait(item) { openTraitEditor("edit", item); }
+function correctPersonalityTrait(item) { openTraitEditor("feedback", item); }
+
+async function loadPersonalityTraitHistory() {
+  const { data: d } = await fetchJsonOnce(apiUrl("personality/traits/history"));
+  personalityTraitHistory = d.ok ? d.history : [];
+  const list = document.getElementById("personality-trait-history");
+  list.replaceChildren();
+  if (!personalityTraitHistory.length) {
+    list.textContent = "No trait history yet.";
+    return;
+  }
+  personalityTraitHistory.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "trait-card trait-history-card";
+    const title = document.createElement("h4");
+    const ownerLabel = item.owner === "candidate"
+      ? "CANDIDATE"
+      : item.owner === "aetheraeon" ? "AETHERAEON" : "USER";
+    title.textContent = `${ownerLabel} ${String(item.action || "updated").toUpperCase()}`;
+    card.append(
+      title,
+      traitDetail("Name", item.trait_name),
+      traitDetail("Ownership", ownerLabel),
+      traitDetail("Date", item.created_at ? new Date(item.created_at).toLocaleString() : "Unknown"),
+      traitDetail("Action", item.action),
+      traitDetail("Reason", item.reason),
+      traitDetail("Source", item.source_label || item.source),
+    );
+    card.setAttribute("role", "button");
+    card.tabIndex = 0;
+    const openRelated = () => openTraitHistoryItem(item);
+    card.onclick = openRelated;
+    card.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openRelated();
+      }
+    };
+    list.appendChild(card);
+  });
+}
+
+function openTraitHistoryItem(item) {
+  if (item.owner === "candidate") {
+    showTraitTab("candidates");
+    return;
+  }
+  const trait = personalityTraits.find((entry) => entry.id === item.trait_id);
+  if (!trait) {
+    showToast("This trait is no longer active.");
+    return;
+  }
+  if (item.owner === "aetheraeon") correctPersonalityTrait(trait);
+  else editPersonalityTrait(trait);
 }
 
 async function removePersonalityTrait(id) {
-  const r = await fetch("/api/personality/traits", {
+  const promotedCandidateIds = new Set(
+    personalityTraitCandidates
+      .filter((item) => Number(item.promoted_trait_id) === Number(id))
+      .map((item) => String(item.id)),
+  );
+  const r = await fetch(apiUrl("personality/traits"), {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
@@ -1789,7 +2906,19 @@ async function removePersonalityTrait(id) {
     document.getElementById("trait-manager-err").textContent = d.error || "Failed.";
     return;
   }
-  await loadPersonalityTraits();
+
+  personalityTraits = personalityTraits.filter((item) => Number(item.id) !== Number(id));
+  personalityTraitCandidates = personalityTraitCandidates.filter(
+    (item) => !promotedCandidateIds.has(String(item.id)),
+  );
+  personalityTraitHistory = personalityTraitHistory.filter((item) => (
+    !promotedCandidateIds.has(String(item.candidate_id))
+    && !(Number(item.trait_id) === Number(id) && item.source === "aetheraeon_evolution")
+  ));
+  renderPersonalityTraits();
+
+  await Promise.all([loadPersonalityTraits(), loadPersonalityTraitHistory()]);
+  showToast("Trait removed");
 }
 
 async function saveWebSearchToggle(enabled) {
@@ -1799,7 +2928,7 @@ async function saveWebSearchToggle(enabled) {
   // The value is read by api_chat on every request.
   // ----------------------------------------------------------
   try {
-    const r = await fetch("/api/settings", {
+    const r = await fetch(apiUrl("settings"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ web_search_enabled: enabled ? 1 : 0 }),
@@ -1818,8 +2947,7 @@ async function loadWebSearchToggle() {
   // set the checkbox state to match.  Called inside loadSettingsData.
   // ----------------------------------------------------------
   try {
-    const r = await fetch("/api/settings");
-    const d = await r.json();
+    const { data: d } = await fetchJsonOnce(apiUrl("settings"));
     if (d.ok && d.settings) {
       const el = document.getElementById("web-search-toggle");
       if (el) el.checked = !!d.settings.web_search_enabled;
@@ -1838,8 +2966,7 @@ function makeId() {
 
 async function loadConversations() {
   try {
-    const r = await fetch("/api/conversations");
-    const d = await r.json();
+    const { data: d } = await fetchJsonOnce(apiUrl("conversations"));
     const raw = Array.isArray(d.conversations) ? d.conversations : [];
     const out = {};
     raw.forEach((c) => {
@@ -1869,7 +2996,7 @@ async function newConversation() {
     messages: [],
   };
   try {
-    const response = await fetch("/api/conversations/create", {
+    const response = await fetch(apiUrl("conversations/create"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation_id: cid, name: "New Conversation" }),
@@ -1888,6 +3015,7 @@ async function newConversation() {
 
 async function activateConv(cid) {
   if (!conversations[cid]) return;
+  clearChoiceComposerNotice();
   stopGreetingRotation();
   activeConvId = cid;
   document.getElementById("conv-title-display").textContent = conversations[cid].name || "Untitled";
@@ -1897,6 +3025,10 @@ async function activateConv(cid) {
 
 function stopGreetingRotation() {
   _greetingRequest++;
+  const controller = _greetingAbortController;
+  _greetingAbortController = null;
+  _greetingOwnerConversationId = null;
+  if (controller && !controller.signal.aborted) controller.abort();
   _greetingDeadline = 0;
   _nextGreeting = null;
   if (_greetingTimer) {
@@ -1912,6 +3044,33 @@ function stopGreetingRotation() {
     clearInterval(_greetingCountdownTimer);
     _greetingCountdownTimer = null;
   }
+}
+
+function beginGreetingRequest() {
+  const previousController = _greetingAbortController;
+  if (previousController && !previousController.signal.aborted) previousController.abort();
+
+  const request = {
+    controller: new AbortController(),
+    conversationId: activeConvId,
+    requestId: ++_greetingRequest,
+  };
+  _greetingAbortController = request.controller;
+  _greetingOwnerConversationId = request.conversationId;
+  return request;
+}
+
+function isCurrentGreetingRequest(request) {
+  return request.requestId === _greetingRequest
+    && request.controller === _greetingAbortController
+    && request.conversationId === _greetingOwnerConversationId
+    && request.conversationId === activeConvId;
+}
+
+function finishGreetingRequest(request) {
+  if (request.controller !== _greetingAbortController) return;
+  _greetingAbortController = null;
+  _greetingOwnerConversationId = null;
 }
 
 function scheduleGreetingRotation(refreshSeconds, prefetchLeadSeconds = 30) {
@@ -1994,24 +3153,31 @@ function startGreetingCountdown() {
 // Called by: Greeting loading, refresh, and prefetch flows.
 // Updates: The temporary greeting node inside the chat container.
 // ------------------------------------------------------
-function renderTemporaryGreeting(text, loading = false) {
+function renderTemporaryGreeting(text, loading = false, processing = null) {
   if (activeConvId || input.value.trim()) return;
   const visibleText = String(text || "").trim() || (loading ? "Aetheraeon is thinking..." : "");
   if (!visibleText) return;
   const panel = document.createElement("div");
   const effect = loading ? "greeting-loading" : selectGreetingEffect();
-  panel.className = `msg msg-ai temporary-greeting ${effect}${loading ? " loading" : ""}`;
+  const renderedAt = Date.now();
+  panel.className = `msg msg-ai temporary-greeting${loading ? " loading" : ""}`;
   panel.dataset.greetingState = loading ? "loading" : "ready";
+  setMessageExportData(panel, "ai", visibleText, "chat", renderedAt, !loading);
   const bubble = document.createElement("div");
-  bubble.className = "bubble" + (loading ? " typing" : "");
+  bubble.className = `bubble greeting-body ${effect}${loading ? " typing" : ""}`;
   bubble.textContent = visibleText;
   if (!loading) _activeGreetingText = visibleText;
+  panel.appendChild(createMessageMeta("ai", "chat", renderedAt));
+  panel.appendChild(bubble);
+  const processingDetails = !loading && processing
+    ? buildProcessingDetails(processing, "greeting")
+    : null;
+  if (processingDetails) panel.appendChild(processingDetails);
   if (SHOW_GREETING_COUNTDOWN && !loading) {
     const countdown = document.createElement("div");
     countdown.className = "greeting-countdown";
     panel.appendChild(countdown);
   }
-  panel.appendChild(bubble);
   chat.replaceChildren(panel);
   if (!loading) updateGreetingCountdown();
 }
@@ -2070,7 +3236,7 @@ function showGreetingLoadingState() {
 function startGreetingLoadingMessages() {
   stopGreetingLoadingMessages();
   showGreetingLoadingState();
-  _greetingLoadingTimer = setInterval(showGreetingLoadingState, 2200);
+  _greetingLoadingTimer = setInterval(showGreetingLoadingState, 7700);
 }
 
 function ensureGreetingLoadingState() {
@@ -2088,43 +3254,46 @@ function stopGreetingLoadingMessages() {
 }
 
 function clearTemporaryGreetingForInteraction() {
-  if (!chat.querySelector(".temporary-greeting")) return;
   stopGreetingRotation();
+  if (!chat.querySelector(".temporary-greeting")) return;
   chat.innerHTML = "";
 }
 
 async function refreshTemporaryGreeting() {
   if (activeConvId || input.value.trim()) return;
-  const requestId = ++_greetingRequest;
+  const request = beginGreetingRequest();
   startGreetingLoadingMessages();
 
   try {
-    const response = await fetch("/api/greeting");
-    const data = await response.json();
-    if (requestId !== _greetingRequest || activeConvId || input.value.trim()) return;
+    const response = await fetch(apiUrl("greeting"), { signal: request.controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!isCurrentGreetingRequest(request) || activeConvId || input.value.trim()) return;
     if (!response.ok || !data.ok || !data.greeting) {
       ensureGreetingLoadingState();
       _greetingTimer = setTimeout(refreshTemporaryGreeting, 10000);
       return;
     }
     stopGreetingLoadingMessages();
-    renderTemporaryGreeting(data.greeting);
+    renderTemporaryGreeting(data.greeting, false, data.processing);
     scheduleGreetingRotation(data.refresh_seconds, data.prefetch_lead_seconds);
-  } catch {
-    if (requestId === _greetingRequest && !activeConvId && !input.value.trim()) {
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    if (isCurrentGreetingRequest(request) && !activeConvId && !input.value.trim()) {
       ensureGreetingLoadingState();
       _greetingTimer = setTimeout(refreshTemporaryGreeting, 10000);
     }
+  } finally {
+    finishGreetingRequest(request);
   }
 }
 
 async function prefetchTemporaryGreeting() {
   if (activeConvId || input.value.trim()) return;
-  const requestId = _greetingRequest;
+  const request = beginGreetingRequest();
   try {
-    const response = await fetch("/api/greeting?refresh=1");
-    const data = await response.json();
-    if (requestId !== _greetingRequest || activeConvId || input.value.trim()) return;
+    const response = await fetch(apiUrl("greeting?refresh=1"), { signal: request.controller.signal });
+    const data = await response.json().catch(() => ({}));
+    if (!isCurrentGreetingRequest(request) || activeConvId || input.value.trim()) return;
     if (!response.ok || !data.ok || !data.greeting) throw new Error("Greeting unavailable");
     if (data.source === "fallback" && chat.querySelector(".temporary-greeting:not(.loading)")) {
       _greetingPrefetchTimer = setTimeout(prefetchTemporaryGreeting, 5000);
@@ -2132,10 +3301,13 @@ async function prefetchTemporaryGreeting() {
     }
     _nextGreeting = data;
     if (Date.now() >= _greetingDeadline) swapPrefetchedGreeting();
-  } catch {
-    if (requestId === _greetingRequest && !activeConvId && !input.value.trim()) {
+  } catch (error) {
+    if (error?.name === "AbortError") return;
+    if (isCurrentGreetingRequest(request) && !activeConvId && !input.value.trim()) {
       _greetingPrefetchTimer = setTimeout(prefetchTemporaryGreeting, 5000);
     }
+  } finally {
+    finishGreetingRequest(request);
   }
 }
 
@@ -2146,16 +3318,17 @@ function swapPrefetchedGreeting() {
     return;
   }
   const next = _nextGreeting;
-  renderTemporaryGreeting(next.greeting);
+  renderTemporaryGreeting(next.greeting, false, next.processing);
   scheduleGreetingRotation(next.refresh_seconds, next.prefetch_lead_seconds);
 }
 
 function showNoConversationState() {
+  clearChoiceComposerNotice();
   activeConvId = null;
   document.getElementById("conv-title-display").textContent = "";
   renderSidebar();
   stopGreetingRotation();
-  refreshTemporaryGreeting();
+  void refreshTemporaryGreeting();
 }
 
 function toggleConversation(cid) {
@@ -2167,17 +3340,21 @@ function toggleConversation(cid) {
 }
 
 async function loadAndRenderMessages(cid) {
+  clearChoiceComposerNotice();
   chat.innerHTML = "";
   try {
-    const r = await fetch(`/api/messages?conversation_id=${encodeURIComponent(cid)}`);
-    const d = await r.json();
+    const { data: d } = await fetchJsonOnce(apiUrl(`messages?conversation_id=${encodeURIComponent(cid)}`));
+    if (activeConvId !== cid) return;
     if (d.ok && d.messages) {
       d.messages.forEach((m) => {
         addMsgDOM(
           m.role === "user" ? "you" : "ai",
           m.content || "",
-          m.tool_used || "system",
-          m.created_at ? m.created_at.slice(11, 16) : Date.now(),
+          m.tool_used || "chat",
+          m.created_at || Date.now(),
+          m.processing || null,
+          m.message_id || null,
+          m.response_metadata || null,
         );
       });
     }
@@ -2186,13 +3363,11 @@ async function loadAndRenderMessages(cid) {
 }
 
 async function deleteConv(cid) {
-  if (!confirm("Delete this conversation? This cannot be undone.")) return;
-
   const backup = conversations[cid];
 
   try {
     // ── 1. DELETE ON SERVER FIRST ──
-    const r = await fetch("/api/conversations/delete", {
+    const r = await fetch(apiUrl("conversations/delete"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation_id: cid }),
@@ -2210,6 +3385,8 @@ async function deleteConv(cid) {
       showNoConversationState();
     }
 
+    showToast("Conversation deleted");
+
     // ── 4. SAFE ACTIVATION ──
   } catch (err) {
     // ── rollback if anything fails ──
@@ -2219,6 +3396,7 @@ async function deleteConv(cid) {
     }
 
     console.error("Delete failed:", err);
+    showToast(err.message || "Unable to delete conversation.", "var(--red)");
   }
 }
 
@@ -2240,7 +3418,7 @@ async function renameConv(cid, newName) {
 
   try {
     // ── 2. Persist to backend ──
-    const res = await fetch("/api/conversations/rename", {
+    const res = await fetch(apiUrl("conversations/rename"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation_id: cid, name: clean }),
@@ -2272,7 +3450,7 @@ async function togglePin(cid) {
   conversations[cid].pinned = !old;
   renderSidebar();
   try {
-    await fetch("/api/conversations/pin", {
+    await fetch(apiUrl("conversations/pin"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversation_id: cid, pinned: conversations[cid].pinned }),
@@ -2347,12 +3525,15 @@ function renderSidebar() {
       // MENU BUTTON
       const menuBtn = document.createElement("button");
       menuBtn.className = "conv-menu-btn";
+      menuBtn.setAttribute("aria-haspopup", "menu");
+      menuBtn.setAttribute("aria-expanded", "false");
       menuBtn.textContent = "⋮";
 
       // DROPDOWN MENU
       const menu = document.createElement("div");
       menu.className = "conv-dropdown-menu";
       menu.style.display = "none";
+      menu.setAttribute("role", "menu");
 
       // HELPER
       function addMenuItem(label, fn) {
@@ -2364,7 +3545,7 @@ function renderSidebar() {
         btn.onclick = (e) => {
           e.stopPropagation();
 
-          menu.style.display = "none";
+          setConversationMenuOpen(menu, false);
 
           fn();
         };
@@ -2404,12 +3585,10 @@ function renderSidebar() {
         const isOpen = menu.style.display === "block";
 
         // CLOSE ALL MENUS
-        document.querySelectorAll(".conv-dropdown-menu").forEach((m) => {
-          m.style.display = "none";
-        });
+        closeConversationMenus();
 
         // TOGGLE CURRENT
-        menu.style.display = isOpen ? "none" : "block";
+        setConversationMenuOpen(menu, !isOpen);
       };
 
       // APPEND
@@ -2433,9 +3612,7 @@ function filterConvList() {
 
 // CLOSE MENUS WHEN CLICKING OUTSIDE
 document.addEventListener("click", () => {
-  document.querySelectorAll(".conv-dropdown-menu").forEach((menu) => {
-    menu.style.display = "none";
-  });
+  closeConversationMenus();
 });
 
 // ────────────────────────────────────────────────────────────
@@ -2459,7 +3636,7 @@ async function renderPlaybooks() {
   container.innerHTML =
     '<div style="font-size:0.72em;color:var(--muted);padding:10px 12px">Loading…</div>';
   try {
-    const r = await fetch("/api/playbooks");
+    const r = await fetch(apiUrl("playbooks"));
     const d = await r.json();
     container.innerHTML = "";
     if (!d.ok || !d.playbooks.length) {
@@ -2485,12 +3662,15 @@ async function renderPlaybooks() {
       // MENU BUTTON
       const menuBtn = document.createElement("button");
       menuBtn.className = "conv-menu-btn";
+      menuBtn.setAttribute("aria-haspopup", "menu");
+      menuBtn.setAttribute("aria-expanded", "false");
       menuBtn.textContent = "⋮";
 
       // MENU
       const menu = document.createElement("div");
       menu.className = "conv-dropdown-menu";
       menu.style.display = "none";
+      menu.setAttribute("role", "menu");
 
       // HELPER
       function addMenuItem(label, fn, extraClass = "") {
@@ -2502,7 +3682,7 @@ async function renderPlaybooks() {
         btn.onclick = (e) => {
           e.stopPropagation();
 
-          menu.style.display = "none";
+          setConversationMenuOpen(menu, false);
 
           fn();
         };
@@ -2527,13 +3707,17 @@ async function renderPlaybooks() {
       addMenuItem(
         "Delete",
         () => {
-          if (!confirm(`Delete playbook "${pb.name}"?`)) return;
-
-          fetch("/api/playbooks/delete", {
+          fetch(apiUrl("playbooks/delete"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ id: pb.id }),
-          }).then(() => renderPlaybooks());
+          })
+            .then((response) => {
+              if (!response.ok) throw new Error("Unable to delete playbook.");
+              showToast("Playbook deleted");
+              return renderPlaybooks();
+            })
+            .catch((error) => showToast(error.message, "var(--red)"));
         },
         "danger",
       );
@@ -2544,11 +3728,9 @@ async function renderPlaybooks() {
 
         const isOpen = menu.style.display === "block";
 
-        document.querySelectorAll(".conv-dropdown-menu").forEach((m) => {
-          m.style.display = "none";
-        });
+        closeConversationMenus();
 
-        menu.style.display = isOpen ? "none" : "block";
+        setConversationMenuOpen(menu, !isOpen);
       };
 
       acts.appendChild(menuBtn);
@@ -2639,10 +3821,10 @@ async function savePlaybook() {
   const content = JSON.stringify({ name, description: desc, steps });
 
   try {
-    let url = "/api/playbooks/create";
+    let url = apiUrl("playbooks/create");
     let body = { name, content };
     if (_editingPbId) {
-      url = "/api/playbooks/update";
+      url = apiUrl("playbooks/update");
       body = { id: _editingPbId, name, content };
     }
     const r = await fetch(url, {
@@ -2679,23 +3861,50 @@ function parseMessageContent(text) {
       // Extract language hint and code
       const inner = part.slice(3, -3);
       const nlIndex = inner.indexOf("\n");
-      const lang = nlIndex > -1 ? inner.slice(0, nlIndex).trim() : "";
-      const code = nlIndex > -1 ? inner.slice(nlIndex + 1) : inner;
+      const langHint = nlIndex > -1 ? inner.slice(0, nlIndex).trim() : "";
+      const rawCode = nlIndex > -1 ? inner.slice(nlIndex + 1) : inner;
+      // The newline immediately before a closing Markdown fence is structural,
+      // not part of the snippet users expect to copy or download.
+      const code = rawCode.replace(/\r\n/g, "\n").replace(/\n$/, "");
+      const lang = detectCodeLanguage(code, langHint);
 
       const pre = document.createElement("pre");
+      pre.className = "code-block";
+      pre.dataset.language = lang;
+      const toolbar = document.createElement("div");
+      toolbar.className = "code-toolbar";
+      const languageLabel = document.createElement("span");
+      languageLabel.className = "code-language";
+      languageLabel.textContent = lang;
       const code_el = document.createElement("code");
-      code_el.textContent = code;
-      pre.appendChild(code_el);
+      code_el.className = `language-${lang}`;
+      code.split("\n").forEach((line, index) => {
+        const row = document.createElement("span");
+        row.className = "code-line";
+        const number = document.createElement("span");
+        number.className = "code-line-number";
+        number.setAttribute("aria-hidden", "true");
+        number.textContent = String(index + 1);
+        const content = document.createElement("span");
+        content.className = "code-line-content";
+        content.appendChild(highlightCodeLine(line, lang));
+        row.append(number, content);
+        code_el.appendChild(row);
+      });
 
-      // Copy button
       const copyBtn = document.createElement("button");
       copyBtn.className = "code-copy-btn";
-      copyBtn.textContent = lang ? `📋 ${lang}` : "📋 copy";
+      copyBtn.textContent = "📋 Copy Code";
       copyBtn.onclick = () => {
         copyToClipboard(code);
         showToast("Code copied!");
       };
-      pre.appendChild(copyBtn);
+      const downloadBtn = document.createElement("button");
+      downloadBtn.className = "code-download-btn";
+      downloadBtn.textContent = "⬇ Download";
+      downloadBtn.onclick = () => downloadFile(code, `aetheraeon-code.${codeExtension(lang)}`);
+      toolbar.append(languageLabel, copyBtn, downloadBtn);
+      pre.append(toolbar, code_el);
       container.appendChild(pre);
     } else {
       // Handle inline code (`...`)
@@ -2714,21 +3923,358 @@ function parseMessageContent(text) {
   return container;
 }
 
+function buildProcessingDetails(processing, route) {
+  if (!displayPreferences.show_processing_details) return null;
+  const data = processing || {};
+  // Older persisted messages may contain heuristic percentages from the
+  // retired processing implementation. Never present those as telemetry.
+  const legacyEstimated = data.estimated_influence === true;
+  const details = document.createElement("details");
+  details.className = `processing-details processing-${displayPreferences.processing_details_mode}`;
+  details.open = !!displayPreferences.processing_details_expanded;
+  const summary = document.createElement("summary");
+  summary.textContent = "AI processing details";
+  details.appendChild(summary);
+
+  const fields = [
+    ["Intent classification", titleCaseProcessingValue(data.intent || route || "None")],
+    ["Routing confidence", percentOrZero(legacyEstimated ? 0 : data.routing_confidence)],
+    ["Sources / Tools Used", Array.isArray(data.sources_tools) && data.sources_tools.length ? data.sources_tools.map(titleCaseProcessingValue).join(", ") : (route ? titleCaseProcessingValue(route) : "None")],
+  ];
+  if (displayPreferences.processing_details_mode === "detailed") {
+    fields.splice(0, 0,
+      ["Analytical reasoning influence", percentOrZero(legacyEstimated ? 0 : data.analytical_influence)],
+      ["Creative reasoning influence", percentOrZero(legacyEstimated ? 0 : data.creative_influence)],
+      ["Short-term memory usage", percentOrZero(legacyEstimated ? 0 : data.short_term_memory_usage)],
+      ["Long-term memory influence", percentOrZero(legacyEstimated ? 0 : data.long_term_memory_usage)],
+      ["Long-term memory search", legacyEstimated ? "Not Used" : (data.memory_search_status || "Not Used")],
+      ["Memory results found", legacyEstimated ? 0 : (Number(data.memories_found) || 0)],
+      ["Memories injected", legacyEstimated ? 0 : (Number(data.memories_injected) || 0)],
+    );
+    if (!legacyEstimated && data.memory_retrieval_attempted) {
+      fields.push(
+        ["Long-term memory retrieval", data.memory_retrieval_completed ? "Completed" : "Failed"],
+        ["Memory retrieval method", data.memory_retrieval_method || "Unspecified"],
+      );
+    }
+    fields.push(["Personality influence", titleCaseProcessingValue(
+      legacyEstimated ? "Not Used" : (data.personality_influence || "Not Used")
+    )]);
+    if (!legacyEstimated && data.cognition_bypassed) {
+      fields.push([
+        "Cognition pipeline",
+        data.cognition_bypass_reason || "Intentionally bypassed",
+      ]);
+    }
+    if (!legacyEstimated && data.conversation_history_searched) {
+      fields.push(
+        ["Conversation history search", "Completed"],
+        ["Conversation history items found", Number(data.conversation_history_items_found) || 0],
+        ["Conversation history references injected", Number(data.conversation_history_items_injected) || 0],
+      );
+    }
+    if (!legacyEstimated && data.greeting_source) {
+      fields.push([
+        "Greeting generation",
+        data.generation_cached
+          ? `Cached ${titleCaseProcessingValue(data.greeting_source)}`
+          : titleCaseProcessingValue(data.greeting_source),
+      ]);
+    }
+    const personalityDebug = !legacyEstimated && data.personality_debug;
+    if (personalityDebug && typeof personalityDebug === "object") {
+      fields.push(
+        ["Base Settings", formatPersonalityDebugSettings(personalityDebug.base_settings)],
+        ["Trait Modifiers", formatPersonalityTraitModifiers(personalityDebug.trait_modifiers)],
+        ["Effective Personality", formatPersonalityDebugSettings(personalityDebug.effective_personality)],
+      );
+    }
+    if (!legacyEstimated && data.memory_operation && data.memory_operation !== "Not Used") {
+      fields.push(
+        ["Memory operation", data.memory_operation],
+        ["Destination", data.memory_destination || "Not Used"],
+        ["Write attempted", data.memory_write_attempted ? "Yes" : "No"],
+        ["Write result", data.memory_write_result || "Not Used"],
+      );
+    }
+    const semanticShadow = !legacyEstimated && data.semantic_memory_shadow;
+    if (semanticShadow && semanticShadow.mode === "shadow") {
+      const semantic = semanticShadow.semantic || {};
+      const legacy = semanticShadow.legacy || {};
+      const candidates = semantic.candidate_counts || {};
+      const selected = semantic.selected_counts || {};
+      const compression = semantic.compression || {};
+      fields.push(
+        ["Semantic shadow retrieval", semantic.retrieval_method || "Not Used"],
+        ["Legacy retrieval method", legacy.retrieval_method || "Not Used"],
+        ["Shadow candidates found", `Chroma: ${Number(candidates.chromadb) || 0}; Conversations: ${Number(candidates.conversation_history) || 0}`],
+        ["Shadow candidates selected", `Chroma: ${Number(selected.chromadb) || 0}; Conversations: ${Number(selected.conversation_history) || 0}`],
+        ["Shadow compressed items", Number(compression.compressed_item_count) || 0],
+        ["Shadow injected items", Number(selected.injected_context) || 0],
+      );
+    }
+    const semanticProduction = !legacyEstimated && data.semantic_memory_production;
+    if (semanticProduction && semanticProduction.mode === "production") {
+      const candidates = semanticProduction.candidate_counts || {};
+      const selected = semanticProduction.selected_counts || {};
+      const rotation = semanticProduction.rotation_cycles || {};
+      const compression = semanticProduction.compression || {};
+      fields.push(
+        ["Memory Retrieval Mode", semanticProduction.retrieval_method || "Production Semantic Memory Coordinator"],
+        ["Semantic candidates found", `Chroma: ${Number(candidates.chromadb) || 0}; Conversations: ${Number(candidates.conversation_history) || 0}`],
+        ["Semantic candidates selected", `Chroma: ${Number(selected.chromadb) || 0}; Conversations: ${Number(selected.conversation_history) || 0}`],
+        ["Memory rotation cycle", `Chroma: ${Number(rotation.chromadb) || 0}; Conversations: ${Number(rotation.conversation_history) || 0}`],
+        ["Compressed context items", Number(compression.compressed_item_count) || 0],
+        ["Injected context items", Number(selected.injected_context) || 0],
+      );
+      if (semanticProduction.fallback_used) {
+        fields.push(["Semantic memory fallback", "Legacy retrieval used"]);
+      }
+    }
+  }
+  const grid = document.createElement("div");
+  grid.className = "processing-grid";
+  fields.forEach(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "processing-row";
+    const key = document.createElement("span");
+    key.textContent = label;
+    const output = document.createElement("span");
+    output.textContent = String(value);
+    row.append(key, output);
+    grid.appendChild(row);
+  });
+  details.appendChild(grid);
+  return details;
+}
+
+function formatPersonalityDebugSettings(settings) {
+  if (!settings || typeof settings !== "object") return "Not Used";
+  const labels = {
+    style: "Style", tone: "Tone", verbosity: "Verbosity",
+    humor: "Humor", greeting_style: "Greeting",
+  };
+  const values = Object.entries(labels)
+    .filter(([key]) => settings[key] !== undefined && settings[key] !== null)
+    .map(([key, label]) => `${label}: ${titleCaseProcessingValue(settings[key])}`);
+  return values.join("; ") || "Not Used";
+}
+
+function formatPersonalityTraitModifiers(modifiers) {
+  if (!Array.isArray(modifiers) || !modifiers.length) return "None";
+  return modifiers
+    .map((item) => `${item.trait || "Trait"} ${item.modifier || ""}`.trim())
+    .join("; ");
+}
+
+function percentOrZero(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${Math.max(0, Math.min(100, Math.round(number)))}%` : "0%";
+}
+
+function titleCaseProcessingValue(value) {
+  return String(value || "None").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function detectCodeLanguage(code, hint = "") {
+  const aliases = { py: "python", js: "javascript", ts: "typescript", sh: "shell", ps1: "powershell" };
+  const normalizedHint = String(hint).trim().toLowerCase();
+  if (normalizedHint) return aliases[normalizedHint] || normalizedHint.replace(/[^a-z0-9+#-]/g, "") || "text";
+  if (/^\s*(from\s+\w+\s+import|import\s+\w+|def\s+\w+|class\s+\w+)/m.test(code)) return "python";
+  if (/\b(interface|type)\s+\w+|:\s*(string|number|boolean)\b/.test(code)) return "typescript";
+  if (/\b(const|let|var|function|document\.|console\.)\b/.test(code)) return "javascript";
+  if (/<[a-z][\s\S]*>/i.test(code)) return "html";
+  if (/^\s*[.#]?[\w-]+\s*\{[\s\S]*:[^;]+;/m.test(code)) return "css";
+  if (/^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE)\b/im.test(code)) return "sql";
+  if (/^\s*(Get-|Set-|New-|\$[A-Za-z_])/m.test(code)) return "powershell";
+  return "text";
+}
+
+function highlightCodeLine(line, language) {
+  const fragment = document.createDocumentFragment();
+  const keywords = {
+    python: "and|as|assert|async|await|break|class|continue|def|del|elif|else|except|False|finally|for|from|if|import|in|is|lambda|None|not|or|pass|raise|return|True|try|while|with|yield",
+    javascript: "async|await|break|case|catch|class|const|continue|default|delete|else|export|extends|false|finally|for|from|function|if|import|in|instanceof|let|new|null|of|return|static|switch|this|throw|true|try|typeof|undefined|var|while",
+    typescript: "async|await|boolean|class|const|enum|export|extends|false|from|function|if|implements|import|interface|let|namespace|never|new|null|number|private|protected|public|readonly|return|static|string|true|type|undefined|unknown|void",
+    sql: "ALTER|AND|AS|BY|CREATE|DELETE|DROP|FROM|GROUP|HAVING|INSERT|INTO|JOIN|LIMIT|NOT|NULL|ON|OR|ORDER|SELECT|SET|TABLE|UPDATE|VALUES|WHERE",
+  };
+  const keywordPattern = keywords[language] || "";
+  const tokenPattern = new RegExp(`("(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*'|\\b(?:${keywordPattern || "(?!)"})\\b|\\b\\d+(?:\\.\\d+)?\\b|(?:#|//).*$)`, language === "sql" ? "gi" : "g");
+  let lastIndex = 0;
+  for (const match of line.matchAll(tokenPattern)) {
+    fragment.appendChild(document.createTextNode(line.slice(lastIndex, match.index)));
+    const span = document.createElement("span");
+    const token = match[0];
+    span.className = token.startsWith("#") || token.startsWith("//")
+      ? "syntax-comment"
+      : token.startsWith('"') || token.startsWith("'")
+        ? "syntax-string"
+        : /^\d/.test(token)
+          ? "syntax-number"
+          : "syntax-keyword";
+    span.textContent = token;
+    fragment.appendChild(span);
+    lastIndex = match.index + token.length;
+  }
+  fragment.appendChild(document.createTextNode(line.slice(lastIndex)));
+  return fragment;
+}
+
+function codeExtension(language) {
+  return ({ python: "py", javascript: "js", typescript: "ts", html: "html", css: "css", sql: "sql", powershell: "ps1", shell: "sh" })[language] || "txt";
+}
+
+function showChoiceComposerNotice() {
+  choiceComposerNotice.hidden = false;
+  input.focus();
+}
+
+function clearChoiceComposerNotice() {
+  choiceComposerNotice.hidden = true;
+}
+
+function choiceMetadataSignature(responseMetadata) {
+  if (responseMetadata?.type !== "choice_buttons" ||
+      !Array.isArray(responseMetadata.options)) {
+    return "";
+  }
+  return JSON.stringify(responseMetadata.options.map((option) => [
+    String(option?.label || "").trim(),
+    String(option?.value || "").trim(),
+    String(option?.behavior || "").trim(),
+  ]));
+}
+
+function stripDuplicateChoiceList(text, responseMetadata, removePrompt = false) {
+  if (responseMetadata?.type !== "choice_buttons") return String(text || "");
+  const options = Array.isArray(responseMetadata?.options)
+    ? responseMetadata.options
+    : [];
+  const optionText = new Set();
+  const normalizeOptionText = (value) => String(value || "")
+    .trim()
+    .replace(/^\[|\]$/g, "")
+    .replace(/[*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+  options.forEach((option) => {
+    const label = normalizeOptionText(option?.label);
+    const value = normalizeOptionText(option?.value);
+    if (label) optionText.add(label);
+    if (value) optionText.add(value);
+  });
+
+  let insideCodeFence = false;
+  const remainingLines = String(text || "").split(/\r?\n/).filter((line) => {
+    const trimmed = line.trim();
+    if (/^(?:```|~~~)/.test(trimmed)) {
+      insideCodeFence = !insideCodeFence;
+      return true;
+    }
+    if (insideCodeFence) return true;
+    if (removePrompt && /^please choose an action[:.]?$/i.test(trimmed)) {
+      return false;
+    }
+    const numberedChoice = trimmed.match(/^\d+[.)]\s+(.+)$/);
+    return !numberedChoice ||
+      !optionText.has(normalizeOptionText(numberedChoice[1]));
+  });
+  const stripped = remainingLines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return stripped || String(text || "");
+}
+
+function stripRepeatedChoicePrompt(text, responseMetadata) {
+  return stripDuplicateChoiceList(text, responseMetadata, true);
+}
+
+// ------------------------------------------------------
+// Function: createChoiceButtonGroup()
+// Purpose: Renders optional response choices without creating a separate action path.
+// Called by: addMsgDOM() for AI messages carrying choice_buttons metadata.
+// Updates: Existing message input through sendCmd() or focuses it for a custom response.
+// ------------------------------------------------------
+function createChoiceButtonGroup(responseMetadata) {
+  if (responseMetadata?.type !== "choice_buttons" ||
+      !Array.isArray(responseMetadata.options)) {
+    return null;
+  }
+
+  const options = responseMetadata.options
+    .filter((option) => option && typeof option.label === "string")
+    .map((option) => ({
+      label: option.label.trim(),
+      value: typeof option.value === "string" ? option.value.trim() : "",
+      behavior: String(option.behavior || "").trim(),
+    }))
+    .filter((option) => option.label &&
+      (option.value || option.behavior === "custom_input"))
+    .slice(0, 24);
+
+  if (!options.length) return null;
+
+  const group = document.createElement("div");
+  group.className = "chat-choice-actions";
+  if (options.length > 5) group.classList.add("chat-choice-grid");
+  group.setAttribute("role", "group");
+  group.setAttribute("aria-label", "Response choices");
+
+  options.forEach((option) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chat-choice-button";
+    button.textContent = option.label;
+    button.setAttribute("aria-pressed", "false");
+
+    button.onclick = async () => {
+      if (option.behavior === "custom_input") {
+        showChoiceComposerNotice();
+        return;
+      }
+
+      group.querySelectorAll(".chat-choice-button").forEach((choice) => {
+        choice.disabled = true;
+      });
+      button.classList.add("selected");
+      button.setAttribute("aria-pressed", "true");
+      await sendCmd(option.value, {
+        choiceSignature: choiceMetadataSignature(responseMetadata),
+      });
+    };
+
+    group.appendChild(button);
+  });
+
+  return group;
+}
+
 // ------------------------------------------------------
 // Function: addMsgDOM()
 // Purpose: Builds and appends a visible chat message from server-backed message data.
 // Called by: Conversation loading, chat submission, status notices, and greeting flows.
 // Updates: The chat message container.
 // ------------------------------------------------------
-function addMsgDOM(who, text, tool, ts) {
+function addMsgDOM(
+  who,
+  text,
+  tool,
+  ts,
+  processing = null,
+  messageId = null,
+  responseMetadata = null,
+) {
   const wrap = document.createElement("div");
   wrap.className = "msg msg-" + who;
+  if (messageId !== null && messageId !== undefined) {
+    wrap.dataset.messageId = String(messageId);
+  }
+  const renderedAt = ts || Date.now();
+  const route = who === "ai" ? normalizeTool(tool) : "";
+  setMessageExportData(wrap, who, text, route, renderedAt);
 
   const bubble = document.createElement("div");
   bubble.className = "bubble";
 
-  let processBlock = null;
-  let details = null;
+  let details = who === "ai" ? buildProcessingDetails(processing, route) : null;
 
   // ── PROCESS EXTRACTION (AI ONLY) ─────────────────────
   if (who === "ai") {
@@ -2736,22 +4282,9 @@ function addMsgDOM(who, text, tool, ts) {
     const end = text.indexOf("AI:");
 
     if (start !== -1 && end !== -1) {
-      processBlock = text.slice(start + 9, end).trim();
       text = text.slice(0, start) + "AI:" + text.slice(end + 3);
-
-      // build collapsible process UI
-      details = document.createElement("details");
-      details.className = "process-box";
-
-      const summary = document.createElement("summary");
-      summary.textContent = "PROCESS";
-
-      const pre = document.createElement("pre");
-      pre.textContent = processBlock;
-
-      details.appendChild(summary);
-      details.appendChild(pre);
     }
+    text = stripDuplicateChoiceList(text, responseMetadata);
   }
 
   // ── BUBBLE CONTENT RENDERING ─────────────────────────
@@ -2763,22 +4296,19 @@ function addMsgDOM(who, text, tool, ts) {
 
   // ── APPEND IN CORRECT ORDER ──────────────────────────
 
-  // timestamp first (optional style consistency)
-  const meta = document.createElement("div");
-  meta.className = "msg-meta";
-
-  const toolBadge =
-    tool && tool !== "chat" && tool !== "system"
-      ? `<span class="tool-badge tool-${tool}">${toolLabel(tool)}</span>`
-      : "";
-
-  meta.innerHTML = formatTimestamp(ts || Date.now()) + toolBadge;
-  if (who === "you") meta.style.textAlign = "right";
-
-  wrap.appendChild(meta);
+  // Keep metadata independent from body effects. Every AI message gets a
+  // router badge, with Chat as the display fallback for an unassigned route.
+  wrap.appendChild(createMessageMeta(who, route, renderedAt));
 
   // bubble ALWAYS comes second
   wrap.appendChild(bubble);
+
+  const choiceButtons = who === "ai"
+    ? createChoiceButtonGroup(responseMetadata)
+    : null;
+  if (choiceButtons) {
+    wrap.appendChild(choiceButtons);
+  }
 
   // process comes AFTER bubble (clean UX)
   if (details) {
@@ -2814,24 +4344,75 @@ function addMsgDOM(who, text, tool, ts) {
   return wrap;
 }
 
-function toolLabel(t) {
-  const map = {
-    shell: "⚡ shell",
-    aider: "🤖 aider",
-    chromadb_store: "🧠 store",
-    chromadb_recall: "🔍 recall",
-    memory_recall: "🔍 session",
-    n8n: "⚙️ n8n",
-    web_search: "🌐 web",
-    system: "🔧 sys",
+function normalizeTool(tool) {
+  const normalized = String(tool || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-");
+  return normalized || "chat";
+}
+
+function toolLabel(tool) {
+  const route = normalizeTool(tool);
+  const labels = {
+    chat: "🧠 Chat",
+    shell: "⚡ Shell",
+    aider: "💻 Code",
+    code: "💻 Code",
+    chromadb_store: "💾 Memory",
+    chromadb_recall: "💾 Memory",
+    memory: "💾 Memory",
+    memory_recall: "💾 Memory",
+    memory_search: "💾 Memory",
+    n8n: "⚙️ N8n",
+    web: "🌐 Web",
+    web_search: "🌐 Web",
+    personality: "🎭 Personality",
+    playbook: "▶️ Playbook",
+    help: "❓ Help",
+    status: "📊 Status",
+    system: "🔧 System",
   };
-  return map[t] || "🔧 " + t;
+  if (labels[route]) return labels[route];
+  const readable = route.replace(/[-_]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return `🔧 ${readable}`;
+}
+
+function createMessageMeta(who, tool, ts) {
+  const meta = document.createElement("div");
+  meta.className = "msg-meta";
+
+  const timestamp = document.createElement("span");
+  timestamp.className = "msg-timestamp";
+  timestamp.textContent = formatTimestamp(ts);
+  meta.appendChild(timestamp);
+
+  if (who === "ai") {
+    const route = normalizeTool(tool);
+    const badge = document.createElement("span");
+    badge.className = `tool-badge tool-${route}`;
+    badge.dataset.router = route;
+    badge.textContent = toolLabel(route);
+    meta.appendChild(badge);
+  }
+
+  return meta;
+}
+
+function setMessageExportData(wrap, who, text, tool, ts, exportable = true) {
+  wrap.dataset.messageRole = who === "you" ? "user" : "ai";
+  wrap.dataset.messageContent = String(text || "");
+  wrap.dataset.messageTool = who === "ai" ? normalizeTool(tool) : "";
+  wrap.dataset.messageTimestamp = timestampDate(ts).toISOString();
+  wrap.dataset.exportable = exportable ? "true" : "false";
 }
 
 function addTyping() {
   const el = document.createElement("div");
   el.className = "msg msg-ai";
   el.innerHTML = '<div class="bubble typing">Aetheraeon <span>▋</span></div>';
+  el.dataset.exportable = "false";
+  el.prepend(createMessageMeta("ai", "chat", Date.now()));
   chat.appendChild(el);
   scrollBottom();
   return el;
@@ -2854,16 +4435,18 @@ function dumpState(label = "STATE DUMP") {
 // Called by: Send button, keyboard handler, and quick-command controls.
 // Updates: Command history, input state, messages, and conversation metadata.
 // ------------------------------------------------------
-async function sendCmd(cmd) {
+async function sendCmd(cmd, uiContext = null) {
   dumpState("BEFORE SEND");
   console.log("🔥 SEND FUNCTION HIT");
   cmd = (cmd || "").trim();
   if (!cmd) return;
+  closeSlashCommandMenu();
 
   if (!currentUser?.id) {
     showToast("Sign in before sending a message.");
     return;
   }
+  clearChoiceComposerNotice();
 
   const startsNewConversation = !activeConvId;
   const greetingContext = startsNewConversation ? _activeGreetingText : "";
@@ -2897,7 +4480,7 @@ async function sendCmd(cmd) {
   const typing = addTyping();
 
   try {
-    const resp = await fetch("/api/chat", {
+    const resp = await fetch(apiUrl("chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2923,14 +4506,30 @@ async function sendCmd(cmd) {
     // Remove typing indicator
     if (typing?.parentNode) chat.removeChild(typing);
 
-    const text = data.response || data.error || "(no response)";
+    const rawText = data.response || data.error || "(no response)";
+    const repeatedChoiceResponse = Boolean(
+      uiContext?.choiceSignature &&
+      choiceMetadataSignature(data.response_metadata) === uiContext.choiceSignature
+    );
+    const responseMetadata = repeatedChoiceResponse ? null : data.response_metadata;
+    const text = repeatedChoiceResponse
+      ? stripRepeatedChoicePrompt(rawText, data.response_metadata)
+      : rawText;
 
     // ── Handle special actions ─────────────────────────────
     if (data.action === "clear_chat") {
       chat.innerHTML = "";
-      addMsgDOM("ai", text, data.tool || "system", Date.now());
+      addMsgDOM(
+        "ai",
+        text,
+        data.tool || "chat",
+        Date.now(),
+        data.processing,
+        null,
+        responseMetadata,
+      );
     } else if (data.action?.type === "aider_approve") {
-      const msgEl = addMsgDOM("ai", text, data.tool || "aider", Date.now());
+      const msgEl = addMsgDOM("ai", text, data.tool || "aider", Date.now(), data.processing);
       const bubble = msgEl.querySelector(".bubble");
       if (bubble) {
         const det = document.createElement("details");
@@ -2957,11 +4556,13 @@ async function sendCmd(cmd) {
           const tmr = setInterval(() => {
             const s2 = Math.floor((Date.now() - t0) / 1000);
             const b2 = sm.querySelector(".bubble");
-            if (b2)
+            if (b2) {
               b2.textContent = `[AIDER] running… ${String(Math.floor(s2 / 60)).padStart(2, "0")}:${String(s2 % 60).padStart(2, "0")}`;
+              sm.dataset.messageContent = b2.textContent;
+            }
           }, 1000);
           try {
-            const r2 = await fetch("/api/aider/run", {
+            const r2 = await fetch(apiUrl("aider/run"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -2991,7 +4592,15 @@ async function sendCmd(cmd) {
         bubble.appendChild(det);
       }
     } else {
-      addMsgDOM("ai", text, data.tool || "system", Date.now());
+      addMsgDOM(
+        "ai",
+        text,
+        data.tool || "chat",
+        Date.now(),
+        data.processing,
+        null,
+        responseMetadata,
+      );
       // Speak AI response if voice mode is active
       speakText(text);
     }
@@ -3098,12 +4707,10 @@ function toggleVoice() {
     // On iOS the page MUST be served over HTTPS or the API is
     // blocked by the browser regardless of iOS version.
     //
-    // If you are on HTTP localhost this will fail on iOS.
+    // Browser secure-context policy determines availability.
     // ----------------------------------------------------------
-    const isHTTP =
-      window.location.protocol === "http:" && !window.location.hostname.includes("localhost");
-    if (isHTTP) {
-      showToast("Voice requires HTTPS. Access via https:// or localhost.", "var(--orange)");
+    if (!window.isSecureContext) {
+      showToast("Voice requires a secure HTTPS connection.", "var(--orange)");
     } else if (isIOS) {
       showToast(
         "Voice requires Safari iOS 14.5+ or Chrome on iOS. Check your browser.",
@@ -3155,7 +4762,7 @@ function openSearch() {
   inp.onkeydown = (e) => {
     if (e.key === "Enter") {
       clearTimeout(_searchTimer);
-      doSearch();
+      doSearch(false);
     }
   };
 }
@@ -3168,6 +4775,9 @@ function closeSearch() {
   const si = document.getElementById("search-input");
   if (ri) ri.innerHTML = "";
   if (si) si.value = "";
+  _searchCursor = null;
+  _searchQuery = "";
+  _searchRequestId += 1;
 }
 
 function closeSearchIfOutside(e) {
@@ -3176,25 +4786,40 @@ function closeSearchIfOutside(e) {
 
 function debounceSearch() {
   clearTimeout(_searchTimer);
-  _searchTimer = setTimeout(doSearch, 300);
+  _searchTimer = setTimeout(() => doSearch(false), 300);
 }
 
-async function doSearch() {
+async function doSearch(loadMore = false) {
   const q = document.getElementById("search-input").value.trim();
   const resultsEl = document.getElementById("search-results");
   if (!q) {
     resultsEl.innerHTML = "";
+    _searchCursor = null;
+    _searchQuery = "";
     return;
   }
-  resultsEl.innerHTML =
+  if (!loadMore || q !== _searchQuery) {
+    loadMore = false;
+    _searchQuery = q;
+    _searchCursor = null;
+  }
+  if (loadMore && !_searchCursor) return;
+
+  const requestId = ++_searchRequestId;
+  if (!loadMore) resultsEl.innerHTML =
     '<div style="font-size:0.78em;color:var(--muted);padding:8px">Searching…</div>';
   try {
-    const r = await fetch(`/api/messages/search?query=${encodeURIComponent(q)}`);
+    const params = new URLSearchParams({ query: q });
+    if (loadMore) params.set("cursor", _searchCursor);
+    const r = await fetch(apiUrl("messages/search") + "?" + params.toString());
     const d = await r.json();
-    resultsEl.innerHTML = "";
+    if (requestId !== _searchRequestId) return;
+    if (!loadMore) resultsEl.innerHTML = "";
     if (!d.ok || !d.results.length) {
-      resultsEl.innerHTML =
-        '<div style="font-size:0.78em;color:var(--muted);padding:8px">No results.</div>';
+      if (!loadMore) {
+        resultsEl.innerHTML =
+          '<div style="font-size:0.78em;color:var(--muted);padding:8px">No results.</div>';
+      }
       return;
     }
     d.results.forEach((res) => {
@@ -3205,19 +4830,55 @@ async function doSearch() {
         <div class="search-result-text">${highlight(escHtml(res.content || ""), escHtml(q))}</div>
         <div class="search-result-role">${res.role === "user" ? "👤 You" : "🤖 AI"} · ${(res.created_at || "").slice(0, 16)}</div>
       `;
-      el.onclick = () => {
-        closeSearch();
-        if (conversations[res.conversation_id]) activateConv(res.conversation_id);
-        else {
-          showToast("Conversation not loaded.", "var(--orange)");
-        }
-      };
+      el.onclick = () => { void openSearchResult(res); };
       resultsEl.appendChild(el);
     });
+    _searchCursor = d.next_cursor || null;
+    if (d.has_more && _searchCursor) {
+      const more = document.createElement("button");
+      more.type = "button";
+      more.className = "search-load-more";
+      more.textContent = "Load more";
+      more.onclick = () => { void doSearch(true); };
+      resultsEl.appendChild(more);
+    }
   } catch (e) {
+    if (requestId !== _searchRequestId) return;
     resultsEl.innerHTML =
       '<div style="font-size:0.78em;color:var(--red);padding:8px">Search failed.</div>';
   }
+}
+
+async function openSearchResult(result) {
+  const conversationId = result && result.conversation_id;
+  if (!conversationId) {
+    showToast("Conversation unavailable.", "var(--orange)");
+    return;
+  }
+  closeSearch();
+  if (!conversations[conversationId]) {
+    conversations = await loadConversations();
+    renderSidebar();
+  }
+  if (!conversations[conversationId]) {
+    showToast("Conversation unavailable.", "var(--orange)");
+    return;
+  }
+  await activateConv(conversationId);
+  jumpToSearchMessage(result.message_id);
+}
+
+function jumpToSearchMessage(messageId) {
+  const target = [...chat.querySelectorAll(".msg")].find(
+    (element) => element.dataset.messageId === String(messageId),
+  );
+  if (!target) {
+    showToast("Message is no longer available.", "var(--orange)");
+    return;
+  }
+  target.scrollIntoView({ behavior: "smooth", block: "center" });
+  target.classList.add("search-message-target");
+  setTimeout(() => target.classList.remove("search-message-target"), 1800);
 }
 
 function highlight(html, term) {
@@ -3235,66 +4896,108 @@ function highlight(html, term) {
 // STATUS DOTS
 
 let _lastStatusOk = true;
-let _knownServices = ["ollama", "chromadb", "n8n", "aider"]; // shown even when server is down
+const _knownServices = ["Aetheraeon", "aider", "chromadb", "n8n", "ollama"];
 
-/** Render all known service dots as offline (red). Called when server is unreachable. */
-function _renderAllDotsOffline() {
+function _serviceIsOnline(state) {
+  return typeof state === "object" && state !== null ? !!state.status : !!state;
+}
+
+function _renderStatusDots(aiCore, serviceStatus = {}) {
   const el = document.getElementById("status-dots");
-  if (!el) return;
+  if (!el) return { allOk: false, offline: [..._knownServices] };
+  const states = [
+    ["Aetheraeon", !!aiCore],
+    ..._knownServices.slice(1).map((name) => [name, _serviceIsOnline(serviceStatus[name])]),
+  ];
+  const offline = [];
   el.innerHTML = "";
-  _knownServices.forEach((name) => {
+  states.forEach(([name, ok]) => {
+    if (!ok) offline.push(name);
     const w = document.createElement("div");
     w.className = "status-dot-wrap";
-    w.title = `${name}: OFFLINE (server down)`;
+    w.title = `${name}: ${ok ? "online" : "OFFLINE"}`;
     const dot = document.createElement("div");
-    dot.className = "dot fail";
+    dot.className = "dot" + (ok ? " ok" : " fail");
     const lbl = document.createElement("div");
     lbl.className = "dot-label";
     lbl.textContent = name;
     w.append(dot, lbl);
     el.appendChild(w);
   });
+  return { allOk: offline.length === 0, offline };
+}
+
+/** Render all known service dots as offline (red). Called when server is unreachable. */
+function _renderAllDotsOffline() {
+  return _renderStatusDots(false, {});
+}
+
+async function checkCachedServiceStatus() {
+  try {
+    const { response, data } = await fetchJsonOnce(apiUrl("services"), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok || data?.aetheraeon !== true || !data?.status) return null;
+    return data.status;
+  } catch {
+    return null;
+  }
 }
 
 async function refreshStatus() {
+  const apacheHosted = isProductionDeployment();
+  const localDatabasePromise = apacheHosted
+    ? checkProductionDatabaseHealth()
+    : Promise.resolve({ production: false, database: null });
+  const cachedServicesPromise = apacheHosted
+    ? checkCachedServiceStatus()
+    : Promise.resolve(null);
+  const healthEndpoint = apiUrl(apacheHosted ? "health" : "status");
   try {
-    const r = await fetch("/api/status", { signal: AbortSignal.timeout(10000) });
-    const d = await r.json();
+    const { response, data: d } = await fetchJsonOnce(healthEndpoint, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    const available = apacheHosted
+      ? response.ok && d?.ok === true && d?.ai_core === true
+      : response.ok && d?.health?.ai_core === true;
+    const [localDatabase, cachedServices] = await Promise.all([
+      localDatabasePromise,
+      cachedServicesPromise,
+    ]);
+    setBackendAvailability(available);
+    setDeploymentHealth({
+      aiCore: available,
+      database: apacheHosted
+        ? (localDatabase.production ? localDatabase.database : false)
+        : d?.health?.database,
+    });
+    if (!available) throw new Error("Health endpoint unavailable");
 
-    // Remember service names for offline rendering
-    const names = Object.keys(d.status || {});
-    if (names.length) _knownServices = names;
-
-    const el = document.getElementById("status-dots");
-    el.innerHTML = "";
-    let allOk = true;
-    for (const [name, state] of Object.entries(d.status || {})) {
-      const ok = typeof state === "object" && state !== null ? !!state.status : !!state;
-      if (!ok) allOk = false;
-      const w = document.createElement("div");
-      w.className = "status-dot-wrap";
-      w.title = `${name}: ${ok ? "online" : "OFFLINE"}`;
-      const dot = document.createElement("div");
-      dot.className = "dot" + (ok ? " ok" : " fail");
-      const lbl = document.createElement("div");
-      lbl.className = "dot-label";
-      lbl.textContent = name;
-      w.append(dot, lbl);
-      el.appendChild(w);
-    }
+    const rendered = _renderStatusDots(
+      available,
+      apacheHosted ? cachedServices || {} : d.status || {},
+    );
     if (d.version) document.getElementById("app-version").textContent = d.version;
-    if (activeConvId && !allOk && _lastStatusOk) {
-      const off = Object.entries(d.status || {})
-        .filter(
-          ([, state]) => !(typeof state === "object" && state !== null ? state.status : state),
-        )
-        .map(([name]) => name);
-      addMsgDOM("ai", "⚠️ SERVICE OFFLINE: " + off.join(", "), "system", Date.now());
+    if (activeConvId && !rendered.allOk && _lastStatusOk) {
+      addMsgDOM("ai", "⚠️ SERVICE OFFLINE: " + rendered.offline.join(", "), "system", Date.now());
     }
-    _lastStatusOk = allOk;
+    _lastStatusOk = rendered.allOk;
+    return true;
   } catch {
-    // Server is completely unreachable — turn ALL dots red immediately
-    _renderAllDotsOffline();
+    const [localDatabase, cachedServices] = await Promise.all([
+      localDatabasePromise,
+      cachedServicesPromise,
+    ]);
+    setBackendAvailability(false);
+    setDeploymentHealth({
+      aiCore: false,
+      database: apacheHosted
+        ? (localDatabase.production ? localDatabase.database : false)
+        : null,
+    });
+    _renderStatusDots(false, apacheHosted ? cachedServices || {} : {});
     if (activeConvId && _lastStatusOk) {
       addMsgDOM(
         "ai",
@@ -3304,6 +5007,7 @@ async function refreshStatus() {
       );
     }
     _lastStatusOk = false;
+    return false;
   }
 }
 
@@ -3312,7 +5016,7 @@ async function refreshStatus() {
 // ────────────────────────────────────────────────────────────
 
 /**
- * Fetch messages from DB and format as plain text transcript.
+ * Format the active rendered conversation, or fetch an inactive one from DB.
  * Returns a string.
  */
 async function convToText(id) {
@@ -3327,21 +5031,49 @@ async function convToText(id) {
     "",
   ].join("\n");
 
+  // The rendered message list is authoritative for the active conversation.
+  // This also includes any just-rendered reply before a persistence refresh.
+  if (cid === activeConvId) {
+    const visibleMessages = collectVisibleConversationMessages();
+    if (visibleMessages.length) {
+      const body = visibleMessages
+        .map(({ role, content, tool, timestamp }) => {
+          const who = role === "user" ? "You" : "AI";
+          const router = role === "ai" ? `   ${toolLabel(tool)}` : "";
+          return `${formatTimestamp(timestamp)}${router}   ${who}:\n${content}\n`;
+        })
+        .join("\n");
+      return header + "\n" + body;
+    }
+  }
+
   try {
-    const r = await fetch(`/api/messages?conversation_id=${encodeURIComponent(cid)}`);
+    const r = await fetch(apiUrl(`messages?conversation_id=${encodeURIComponent(cid)}`));
     const d = await r.json();
     if (!d.ok || !d.messages?.length) return header + "\n(no messages)";
     const body = d.messages
       .map((m) => {
         const who = m.role === "user" ? "You" : "AI";
         const time = (m.created_at || "").slice(11, 16);
-        return `[${time}] ${who}:\n${m.content || ""}\n`;
+        const router = m.role === "user" ? "" : `   ${toolLabel(m.tool_used || "chat")}`;
+        return `[${time}]${router}   ${who}:\n${m.content || ""}\n`;
       })
       .join("\n");
     return header + "\n" + body;
   } catch {
     return header + "\n(could not load messages)";
   }
+}
+
+function collectVisibleConversationMessages() {
+  return Array.from(chat.querySelectorAll(".msg[data-message-role]"))
+    .filter((message) => message.dataset.exportable !== "false")
+    .map((message) => ({
+      role: message.dataset.messageRole,
+      content: message.dataset.messageContent || "",
+      tool: message.dataset.messageTool || "chat",
+      timestamp: message.dataset.messageTimestamp || Date.now(),
+    }));
 }
 
 function openShareModal(content, isWhole = false) {
@@ -3440,7 +5172,7 @@ async function exportAllConversations() {
     lines.push(`📌 ${conv.name}${conv.pinned ? " [PINNED]" : ""}`);
     lines.push("─".repeat(60));
     try {
-      const r = await fetch(`/api/messages?conversation_id=${encodeURIComponent(id)}`);
+      const r = await fetch(apiUrl(`messages?conversation_id=${encodeURIComponent(id)}`));
       const d = await r.json();
       if (d.ok && d.messages?.length) {
         d.messages.forEach((m) => {
@@ -3549,11 +5281,152 @@ window.addEventListener("resize", () => {
   }
 });
 
+// Slash command autocomplete foundation. This is input assistance only; the
+// backend remains authoritative for command parsing and authorization.
+function slashCommandMatches(value) {
+  const rawText = String(value || "");
+  const text = rawText.trimStart().toLowerCase();
+  if (!text.startsWith("/") || /\n/.test(text)) return [];
+
+  const rootCommands = SLASH_COMMAND_CATALOG.filter((item) => !item.parent);
+  if (text === "/") return rootCommands;
+
+  const exactRoot = rootCommands.find((item) => item.command === text.trimEnd());
+  if (exactRoot && (text === exactRoot.command || text === `${exactRoot.command} `)) {
+    const children = SLASH_COMMAND_CATALOG.filter(
+      (item) => item.parent === exactRoot.command,
+    );
+    return children.length ? children : [exactRoot];
+  }
+
+  if (!text.includes(" ")) {
+    return rootCommands.filter((item) => item.command.startsWith(text));
+  }
+
+  const parent = rootCommands.find((item) => text.startsWith(`${item.command} `));
+  if (!parent) return [];
+  const children = SLASH_COMMAND_CATALOG.filter((item) => item.parent === parent.command);
+  const matches = children.filter((item) => item.command.startsWith(text.trimEnd()));
+  const exactChild = children.find((item) => item.command === text.trimEnd());
+  if (exactChild && (text === exactChild.command || text === `${exactChild.command} `)) {
+    return [exactChild];
+  }
+  return matches;
+}
+
+function closeSlashCommandMenu() {
+  slashCommandSelection = -1;
+  slashCommandMenu.hidden = true;
+  slashCommandMenu.replaceChildren();
+  input.removeAttribute("aria-activedescendant");
+}
+
+function chooseSlashCommand(item) {
+  if (!item) return;
+  input.value = item.parameterHint ? `${item.command} ` : item.command;
+  autoResize();
+  input.focus();
+  const hasChildren = SLASH_COMMAND_CATALOG.some(
+    (candidate) => candidate.parent === item.command,
+  );
+  if (hasChildren || item.parameterHint) renderSlashCommandMenu();
+  else closeSlashCommandMenu();
+}
+
+function updateSlashCommandSelection() {
+  const buttons = [...slashCommandMenu.querySelectorAll(".slash-command-item")];
+  buttons.forEach((button, index) => {
+    const active = index === slashCommandSelection;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  const activeButton = buttons[slashCommandSelection];
+  if (activeButton) {
+    input.setAttribute("aria-activedescendant", activeButton.id);
+    activeButton.scrollIntoView?.({ block: "nearest" });
+  } else {
+    input.removeAttribute("aria-activedescendant");
+  }
+}
+
+function renderSlashCommandMenu() {
+  const items = slashCommandMatches(input.value);
+  if (!items.length) {
+    closeSlashCommandMenu();
+    return [];
+  }
+
+  slashCommandSelection = -1;
+  slashCommandMenu.replaceChildren();
+  items.forEach((item, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = `slash-command-option-${index}`;
+    button.className = "slash-command-item";
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", "false");
+
+    const name = document.createElement("span");
+    name.className = "slash-command-name";
+    name.textContent = item.command;
+    const description = document.createElement("span");
+    description.className = "slash-command-description";
+    description.textContent = item.description;
+    button.append(name, description);
+    if (item.parameterHint) {
+      const hint = document.createElement("span");
+      hint.className = "slash-command-parameter-hint";
+      hint.textContent = item.example
+        ? `${item.parameterHint} · Example: ${item.example}`
+        : item.parameterHint;
+      button.appendChild(hint);
+    }
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      chooseSlashCommand(item);
+    });
+    slashCommandMenu.appendChild(button);
+  });
+  slashCommandMenu.hidden = false;
+  return items;
+}
+
 // JS-011: Event Handlers
 
 sendBtn.addEventListener("click", () => sendCmd(input.value));
+choiceComposerCancel.addEventListener("click", () => {
+  clearChoiceComposerNotice();
+  input.focus();
+});
 
 input.addEventListener("keydown", (e) => {
+  const slashItems = slashCommandMatches(input.value);
+  const slashMenuOpen = !slashCommandMenu.hidden && slashItems.length > 0;
+  if (slashMenuOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    e.preventDefault();
+    const offset = e.key === "ArrowDown" ? 1 : -1;
+    slashCommandSelection = (
+      slashCommandSelection + offset + slashItems.length
+    ) % slashItems.length;
+    updateSlashCommandSelection();
+    return;
+  }
+  if (slashMenuOpen && e.key === "Escape") {
+    e.preventDefault();
+    closeSlashCommandMenu();
+    return;
+  }
+  const exactSlashCommand = slashItems.some(
+    (item) => item.command === input.value.toLowerCase(),
+  );
+  if (
+    slashMenuOpen &&
+    (e.key === "Tab" || (e.key === "Enter" && !exactSlashCommand))
+  ) {
+    e.preventDefault();
+    chooseSlashCommand(slashItems[Math.max(0, slashCommandSelection)]);
+    return;
+  }
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     sendCmd(input.value);
@@ -3585,7 +5458,12 @@ input.addEventListener("keydown", (e) => {
 
 input.addEventListener("input", () => {
   autoResize();
+  renderSlashCommandMenu();
   if (input.value.trim()) clearTemporaryGreetingForInteraction();
+});
+
+document.addEventListener("mousedown", (event) => {
+  if (!event.target.closest("#composer-input-wrap")) closeSlashCommandMenu();
 });
 
 function autoResize() {
@@ -3614,34 +5492,29 @@ function now() {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function timestampDate(ts) {
+  if (!ts) return new Date();
+  if (ts instanceof Date && !isNaN(ts.getTime())) return new Date(ts.getTime());
+
+  // Database timestamps are local SQL datetimes. The ISO-style separator is
+  // consistently parsed by browsers while preserving the intended timezone.
+  const value = typeof ts === "string" ? ts.trim() : ts;
+  const normalized =
+    typeof value === "string" && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(value)
+      ? value.replace(" ", "T")
+      : value;
+  const parsed = new Date(normalized);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
 function formatTimestamp(ts) {
-  let d;
-
-  // ── SAFE INPUT HANDLING ─────────────────────────────
-  if (!ts) {
-    d = new Date();
-  } else {
-    d = new Date(ts);
-
-    // fallback if invalid date
-    if (isNaN(d.getTime())) {
-      d = new Date();
-    }
-  }
-
-  // ── PHP-STYLE COMPONENTS ────────────────────────────
+  const d = timestampDate(ts);
   const MM = String(d.getMonth() + 1).padStart(2, "0");
   const DD = String(d.getDate()).padStart(2, "0");
   const YYYY = d.getFullYear();
-
-  let hh = d.getHours();
   const mm = String(d.getMinutes()).padStart(2, "0");
-  const ampm = hh >= 12 ? "PM" : "AM";
-
-  hh = hh % 12 || 12;
-  hh = String(hh).padStart(2, "0");
-
-  // ── FINAL FORMAT (easy to change like PHP) ───────────
+  const ampm = d.getHours() >= 12 ? "PM" : "AM";
+  const hh = String(d.getHours() % 12 || 12).padStart(2, "0");
   return `${MM}/${DD}/${YYYY} - ${hh}:${mm} ${ampm}`;
 }
 
@@ -3751,10 +5624,30 @@ function showToast(msg, color) {
 // ────────────────────────────────────────────────────────────
 
 function openModal(id) {
-  document.getElementById(id).classList.add("open");
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  modal.classList.add("open");
+  const existing = modalNavigationStack.indexOf(id);
+  if (existing >= 0) modalNavigationStack.splice(existing, 1);
+  modalNavigationStack.push(id);
 }
 function closeModal(id) {
-  document.getElementById(id).classList.remove("open");
+  document.getElementById(id)?.classList.remove("open");
+  let index = modalNavigationStack.indexOf(id);
+  while (index >= 0) {
+    modalNavigationStack.splice(index, 1);
+    index = modalNavigationStack.indexOf(id);
+  }
+}
+
+function getTopOpenModal() {
+  for (let index = modalNavigationStack.length - 1; index >= 0; index--) {
+    const modal = document.getElementById(modalNavigationStack[index]);
+    if (modal?.classList.contains("open")) return modal;
+    modalNavigationStack.splice(index, 1);
+  }
+  const openModals = [...document.querySelectorAll(".modal-overlay.open")];
+  return openModals.at(-1) || null;
 }
 
 function closeModalIfOutside(e, id) {
@@ -3771,7 +5664,7 @@ function closeModalIfOutside(e, id) {
 // Called by: Login/registration success and session restoration.
 // Updates: User identity, theme, conversations, service status, and input focus.
 // ------------------------------------------------------
-async function bootApp(user) {
+async function bootApp(user, sessionData = {}) {
   currentUser = user;
 
   // ── 1. Switch UI ──
@@ -3786,12 +5679,23 @@ async function bootApp(user) {
   document.getElementById("user-avatar").textContent = avatar;
   document.getElementById("user-display-name").textContent = fullName;
   document.getElementById("user-display-email").textContent = email;
+  document.querySelectorAll(".admin-only").forEach((element) =>
+    element.classList.toggle("visible", hasAdministrativeRole(user?.role)),
+  );
+  const adminViewBanner = document.getElementById("admin-view-banner");
+  adminViewBanner.classList.toggle("visible", !!sessionData.administrator_view);
+  document.getElementById("admin-view-user").textContent = fullName;
+  updateMaintenanceBanner(!!sessionData.maintenance_mode, sessionData);
 
   // ── 3. Load theme ──
-  await loadTheme();
+  const dashboardResources = Promise.all([
+    loadTheme(),
+    loadConversations(),
+    refreshStatus(),
+  ]);
 
   // ── 4. Load conversations from DB (source of truth) ──
-  conversations = await loadConversations();
+  conversations = (await dashboardResources)[1];
   showNoConversationState();
 
   // ── 5. Handle EMPTY STATE cleanly ──
@@ -3800,8 +5704,8 @@ async function bootApp(user) {
   // ── 7. Render sidebar AFTER activation (keeps UI consistent) ──
 
   // ── 8. Status polling ──
-  await refreshStatus();
-  _statusTimer = setInterval(refreshStatus, 15000);
+  if (_sessionMonitorTimer) clearInterval(_sessionMonitorTimer);
+  _sessionMonitorTimer = setInterval(monitorSession, 5000);
 
   // ── 9. Focus input ──
   input?.focus();
@@ -3809,8 +5713,14 @@ async function bootApp(user) {
 
 // INIT
 
+initializeFontSelects();
+renderCustomThemeEditor();
+document.getElementById("show-processing-details")?.addEventListener("change", syncProcessingSettingsState);
+syncProcessingSettingsState();
 startBackendAvailabilityMonitoring();
 checkSession();
+const initialResetToken = new URLSearchParams(window.location.search).get("reset_token");
+if (initialResetToken) openResetPassword(initialResetToken);
 
 // JS-009: Animations
 /* =======================================================
@@ -3958,8 +5868,7 @@ async function memLoad() {
   document.getElementById("mem-count-badge").textContent = "Loading…";
 
   try {
-    const r = await fetch("/api/memory/all");
-    const d = await r.json();
+    const { data: d } = await fetchJsonOnce(apiUrl("memory/all"));
 
     if (!d.ok) {
       _memShowError("Server error: " + (d.error || "unknown"));
@@ -4071,11 +5980,28 @@ function _memRender() {
 
     tdAct.append(editBtn, delBtn);
 
-    // ── ID (truncated, full in title tooltip) ─────────────
+    // ── Full ID (selectable and explicitly copyable) ─────
     const tdId = document.createElement("td");
     tdId.className = "mem-id-cell";
-    tdId.textContent = row.id.slice(0, 8) + "…";
-    tdId.title = row.id;
+    const idText = document.createElement("code");
+    idText.className = "mem-id-text";
+    idText.textContent = row.id;
+    idText.title = row.id;
+    const copyIdBtn = document.createElement("button");
+    copyIdBtn.className = "mem-id-copy-btn";
+    copyIdBtn.type = "button";
+    copyIdBtn.textContent = "Copy";
+    copyIdBtn.title = "Copy full memory ID";
+    copyIdBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await navigator.clipboard.writeText(row.id);
+        _memSetStatus("Copied full memory ID");
+      } catch {
+        _memShowError("Could not copy memory ID");
+      }
+    });
+    tdId.append(idText, copyIdBtn);
 
     // ── Row click = select / deselect ─────────────────────
     tr.addEventListener("click", () => {
@@ -4159,7 +6085,7 @@ async function memSemanticSearch() {
 
   _memSetStatus(`Semantic search: "${q}"…`);
   try {
-    const r = await fetch("/api/memory/search", {
+    const r = await fetch(apiUrl("memory/search"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: q, n: 20 }),
@@ -4295,9 +6221,8 @@ function memToggleAll(chkAll) {
  * your existing handle_memory_command_fn(confirmed=True).
  */
 async function memDeleteOne(id, trEl) {
-  if (!confirm("Delete this memory entry?")) return;
   try {
-    const r = await fetch("/api/memory/delete", {
+    const r = await fetch(apiUrl("memory/delete"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id }),
@@ -4314,9 +6239,11 @@ async function memDeleteOne(id, trEl) {
     if (trEl) trEl.style.opacity = "0.3"; // visual feedback
     setTimeout(() => _memRender(), 300);
     _memSetStatus("Deleted 1 memory.");
+    showToast("Memory entry deleted");
     document.getElementById("mem-count-badge").textContent = `${_memAllRows.length} memories`;
   } catch (err) {
     _memSetStatus("Delete error: " + err.message);
+    showToast(err.message || "Unable to delete memory entry.", "var(--red)");
   }
 }
 
@@ -4329,12 +6256,10 @@ async function memDeleteSelected() {
     _memSetStatus("No rows selected.");
     return;
   }
-  if (!confirm(`Delete ${ids.length} selected memory entries? This cannot be undone.`)) return;
-
   let deleted = 0;
   for (const id of ids) {
     try {
-      const r = await fetch("/api/memory/delete", {
+      const r = await fetch(apiUrl("memory/delete"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
@@ -4351,6 +6276,7 @@ async function memDeleteSelected() {
   _memSelected.clear();
   _memRender();
   _memSetStatus(`Deleted ${deleted} of ${ids.length} selected entries.`);
+  showToast(`${deleted} memory ${deleted === 1 ? "entry" : "entries"} deleted`);
   document.getElementById("mem-count-badge").textContent = `${_memAllRows.length} memories`;
 }
 
@@ -4419,7 +6345,7 @@ async function memSaveEdit() {
   try {
     if (_memEditingId) {
       // ── UPDATE existing entry ──────────────────────────
-      const r = await fetch("/api/memory/update", {
+      const r = await fetch(apiUrl("memory/update"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: _memEditingId, text: content, type, source }),
@@ -4447,7 +6373,7 @@ async function memSaveEdit() {
       _memSetStatus("Memory updated.");
     } else {
       // ── CREATE new entry ───────────────────────────────
-      const r = await fetch("/api/memory/create", {
+      const r = await fetch(apiUrl("memory/create"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: content, type, source }),
@@ -4645,7 +6571,7 @@ async function memImportFile(event) {
 
   for (const entry of entries) {
     try {
-      const r = await fetch("/api/memory/create", {
+      const r = await fetch(apiUrl("memory/create"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(entry),

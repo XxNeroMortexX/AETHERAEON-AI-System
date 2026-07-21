@@ -84,7 +84,7 @@ HTML-010 Modals / Popups
       }
     </script>
 
-    <link rel="stylesheet" href="/css/aetheraeon.css" />
+    <link rel="stylesheet" href="css/aetheraeon.css" />
   </head>
   <body>
     <!-- HTML-003: Authentication Area -->
@@ -112,8 +112,8 @@ HTML-010 Modals / Popups
         </div>
 
         <div class="login-field">
-          <label for="auth-email">EMAIL</label>
-          <input type="email" id="auth-email" placeholder="user@example.com" autocomplete="email" />
+          <label for="auth-email">USERNAME OR EMAIL</label>
+          <input type="text" id="auth-email" placeholder="username or user@example.com" autocomplete="username" />
         </div>
         <div class="login-field">
           <label for="auth-password">PASSWORD</label>
@@ -147,6 +147,11 @@ HTML-010 Modals / Popups
         <div id="backend-status" class="backend-status visible" role="status" aria-live="polite">
           Checking Aetheraeon AI server availability…
         </div>
+        <div class="deployment-health" id="deployment-health" aria-label="Deployment health">
+          <span id="health-frontend" class="health-state online">Frontend Online</span>
+          <span id="health-ai-core" class="health-state checking">AI Core Checking</span>
+          <span id="health-database" class="health-state checking">Database Checking</span>
+        </div>
         <button
           class="login-btn"
           id="auth-submit-btn"
@@ -159,6 +164,24 @@ HTML-010 Modals / Popups
         </button>
         <div class="login-switch" id="login-switch-text">
           No account? <span onclick="switchTab('register')">Create one</span>
+        </div>
+        <button class="link-button" id="forgot-password-link" onclick="openForgotPassword()">
+          Forgot password?
+        </button>
+      </div>
+    </div>
+
+    <div id="password-reset-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Reset password">
+      <div class="modal-box compact-modal">
+        <div class="modal-title" id="password-reset-title">Reset Password</div>
+        <div class="modal-sub" id="password-reset-description">Enter your account email.</div>
+        <div class="modal-field" id="reset-email-field"><label for="reset-email">EMAIL</label><input id="reset-email" type="email" autocomplete="email" /></div>
+        <div class="modal-field" id="reset-password-field"><label for="reset-new-password">NEW PASSWORD</label><input id="reset-new-password" type="password" minlength="8" autocomplete="new-password" /></div>
+        <div class="modal-err" id="password-reset-error"></div>
+        <div class="modal-ok" id="password-reset-ok"></div>
+        <div class="modal-actions">
+          <button class="modal-btn" onclick="closePasswordReset()">Cancel</button>
+          <button class="modal-btn primary" id="password-reset-submit" onclick="requestPasswordReset()">Send Reset Link</button>
         </div>
       </div>
     </div>
@@ -181,8 +204,65 @@ HTML-010 Modals / Popups
       <div class="user-menu-item" onclick="openSettings('profile')">👤 Profile</div>
       <div class="user-menu-item" onclick="openSettings('account')">⚙️ Account Settings</div>
       <div class="user-menu-item" onclick="openSettings('models')">🧠 Models</div>
+      <div class="user-menu-item admin-only" id="admin-center-menu" onclick="openAdminCenter()">🛡️ Admin Center</div>
       <div class="user-menu-sep"></div>
       <div class="user-menu-item danger" onclick="logout()">🚪 Logout</div>
+    </div>
+
+    <div id="admin-center-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-label="Admin Center" onclick="closeModalIfOutside(event, 'admin-center-modal')">
+      <div class="modal-box admin-center-box">
+        <div class="admin-center-header">
+          <div>
+            <div class="modal-title">🛡️ Admin Center</div>
+            <div class="admin-center-subtitle">System administration and user management</div>
+          </div>
+        </div>
+        <div class="admin-center-content">
+          <div class="admin-summary" id="admin-diagnostics">Loading diagnostics…</div>
+          <div class="admin-control-grid">
+            <section class="admin-console-section">
+              <div class="admin-section-heading">Maintenance Mode</div>
+              <label class="admin-setting-row"><span><strong>System Access</strong><small>Administrators can still sign in; regular users are blocked.</small></span><input id="maintenance-mode-toggle" type="checkbox" onchange="setMaintenanceMode(this.checked)" /></label>
+            </section>
+            <section class="admin-console-section">
+              <div class="admin-section-heading">Session Management</div>
+              <label><input id="keep-admin-session" type="checkbox" checked /> Keep my current session active</label>
+              <button class="modal-btn danger" onclick="forceLogoutAllUsers()">Force Logout All Users</button>
+              <div class="admin-help-text">This immediately invalidates every active application session.</div>
+            </section>
+            <section class="admin-console-section admin-only" id="deployment-mode-section">
+              <div class="admin-section-heading">Deployment Mode</div>
+              <div class="deployment-mode-summary">
+                <span>Current Mode <strong id="deployment-current-mode">Loading</strong></span>
+                <span>Configured Mode <strong id="deployment-configured-mode">Loading</strong></span>
+              </div>
+              <label for="deployment-mode-select">Mode after restart</label>
+              <select id="deployment-mode-select">
+                <option value="development">Development</option>
+                <option value="production">Production</option>
+              </select>
+              <button class="modal-btn" id="deployment-mode-save" onclick="saveDeploymentMode()">Save Deployment Mode</button>
+              <div class="deployment-restart-notice" id="deployment-restart-notice" hidden>Restart required before this mode becomes active.</div>
+              <div class="admin-help-text">Production expects Apache to serve this same frontend and proxy relative /api requests.</div>
+            </section>
+          </div>
+          <section class="admin-dashboard-card admin-user-management">
+            <div class="admin-section-heading">User Management</div>
+            <div class="admin-table-wrap">
+              <table class="admin-user-table">
+                <thead><tr><th>Username / Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Activity</th><th>Created</th><th>Actions</th></tr></thead>
+                <tbody id="admin-users-body"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="admin-dashboard-card admin-audit-card">
+            <div class="admin-section-heading">Audit Log</div>
+            <div id="admin-audit-list" class="admin-audit-list"></div>
+          </section>
+          <div class="modal-err" id="admin-center-error"></div>
+        </div>
+        <div class="admin-center-footer"><button class="modal-btn" onclick="closeModal('admin-center-modal')">Close</button></div>
+      </div>
     </div>
 
     <!-- ============================================================
@@ -504,7 +584,7 @@ HTML-010 Modals / Popups
             data-panel="personality"
             onclick="switchSettingsTab('personality')"
           >
-            Personality
+           🎭 Personality
           </button>
           <button
             class="settings-tab active"
@@ -540,8 +620,30 @@ HTML-010 Modals / Popups
             <button class="theme-btn" data-theme="matrix" onclick="applyTheme('matrix')">
               💚 Matrix
             </button>
+            <button class="theme-btn" data-theme="custom" onclick="applyTheme('custom')">Custom</button>
           </div>
           <div>Theme is saved and remembered across sessions.</div>
+          <div class="modal-sub">Display and Custom Theme</div>
+          <div class="settings-grid">
+            <div class="modal-field"><label for="display-font-family">FONT FAMILY</label><select id="display-font-family"><option value="system">System</option><option value="sans">Sans Serif</option><option value="serif">Serif</option><option value="mono">Monospace</option></select></div>
+            <div class="modal-field"><label for="display-text-style">TEXT STYLE</label><select id="display-text-style"><option value="normal">Normal</option><option value="bold">Bold</option><option value="italic">Italic</option></select></div>
+            <div class="modal-field"><label for="display-font-size">BASE FONT</label><select id="display-font-size" class="font-size-select"></select></div>
+            <div class="modal-field"><label for="display-chat-size">CHAT FONT</label><select id="display-chat-size" class="font-size-select"></select></div>
+            <div class="modal-field"><label for="display-menu-size">MENU / UI FONT</label><select id="display-menu-size" class="font-size-select"></select></div>
+            <div class="modal-field"><label for="display-header-size">HEADER FONT</label><select id="display-header-size" class="font-size-select"></select></div>
+            <div class="modal-field"><label for="display-code-size">CODE FONT</label><select id="display-code-size" class="font-size-select"></select></div>
+          </div>
+          <button class="modal-btn" type="button" onclick="resetFontSettings()">Reset Font Settings</button>
+          <div class="modal-sub">Custom Theme Colors</div>
+          <div id="custom-theme-editor" class="custom-theme-editor"></div>
+          <div class="modal-sub">AI Processing Details</div>
+          <label><input id="show-processing-details" type="checkbox" /> Show processing details</label>
+          <fieldset id="processing-dependent-settings" class="processing-settings-group">
+            <label><input id="processing-expanded" type="checkbox" /> Expanded by default</label>
+            <div class="modal-field"><label for="processing-mode">DISPLAY</label><select id="processing-mode"><option value="compact">Compact</option><option value="detailed">Detailed</option></select></div>
+          </fieldset>
+          <div class="modal-ok" id="display-settings-ok"></div>
+          <div class="modal-actions"><button class="modal-btn primary" onclick="saveDisplaySettings()">Save Display Settings</button></div>
         </div>
 
         <!-- Profile panel -->
@@ -721,7 +823,7 @@ HTML-010 Modals / Popups
               <option value="conversational">Conversational</option>
             </select>
           </div>
-          <div class="modal-sub">Custom Personality Traits</div>
+          <div class="modal-sub">Structured Traits</div>
           <div id="personality-traits-preview">No custom traits.</div>
           <button class="modal-btn" onclick="openPersonalityManager()">Manage Traits</button>
           <div class="modal-err" id="personality-err"></div>
@@ -747,17 +849,152 @@ HTML-010 Modals / Popups
       aria-label="Manage personality traits"
       onclick="closeModalIfOutside(event, 'personality-manager-modal')"
     >
-      <div class="modal-box">
-        <div class="modal-title">Custom Personality Traits</div>
-        <div id="personality-traits-list"></div>
-        <div class="modal-field">
-          <label for="new-personality-trait">NEW TRAIT</label
-          ><input id="new-personality-trait" maxlength="255" placeholder="e.g. Likes examples" />
+      <div class="modal-box trait-manager-box">
+        <div class="modal-title">Personality Traits</div>
+        <div class="trait-tabs" role="tablist" aria-label="Trait owner">
+          <button id="user-traits-tab" class="modal-btn active" role="tab" onclick="showTraitTab('user')">User Traits</button>
+          <button id="aetheraeon-traits-tab" class="modal-btn" role="tab" onclick="showTraitTab('aetheraeon')">Aetheraeon Traits</button>
+          <button id="trait-candidates-tab" class="modal-btn" role="tab" onclick="showTraitTab('candidates')">Trait Candidates</button>
+          <button id="trait-history-tab" class="modal-btn" role="tab" onclick="showTraitTab('history')">Trait History</button>
         </div>
+        <section id="user-traits-panel" class="trait-panel">
+          <div class="modal-sub">Your durable communication preferences</div>
+          <div id="user-personality-traits-list" class="trait-list"></div>
+          <button class="modal-btn primary" onclick="openTraitEditor('create')">+ Add User Trait</button>
+        </section>
+        <section id="aetheraeon-traits-panel" class="trait-panel hidden">
+          <div class="modal-sub">Aetheraeon's persistent behavior tendencies</div>
+          <div id="aetheraeon-personality-traits-list" class="trait-list"></div>
+        </section>
+        <section id="trait-candidates-panel" class="trait-panel hidden">
+          <div class="modal-sub">Aetheraeon Trait Candidates</div>
+          <div class="trait-help">Observed preferences remain candidates until repeated evidence reaches the promotion threshold.</div>
+          <div class="trait-candidate-tabs" role="tablist" aria-label="Trait candidate status">
+            <button
+              id="active-candidates-tab"
+              class="modal-btn active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="active-candidates-panel"
+              onclick="showCandidateSubTab('active')"
+            >Active Candidates</button>
+            <button
+              id="promoted-candidates-tab"
+              class="modal-btn"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="promoted-candidates-panel"
+              onclick="showCandidateSubTab('promoted')"
+            >Promoted Candidate History</button>
+          </div>
+          <div class="trait-candidate-content" aria-label="Trait candidate learning journey">
+            <section
+              id="active-candidates-panel"
+              class="trait-candidate-section"
+              role="tabpanel"
+              aria-labelledby="active-candidates-tab active-candidates-heading"
+            >
+              <h3 id="active-candidates-heading" class="trait-candidate-heading">Active Candidates</h3>
+              <div class="trait-help">Candidates Aetheraeon is still learning from repeated interactions.</div>
+              <div id="aetheraeon-trait-candidates-list" class="trait-list trait-candidate-list"></div>
+            </section>
+            <section
+              id="promoted-candidates-panel"
+              class="trait-candidate-section hidden"
+              role="tabpanel"
+              aria-labelledby="promoted-candidates-tab promoted-candidates-heading"
+              aria-hidden="true"
+              hidden
+            >
+              <h3 id="promoted-candidates-heading" class="trait-candidate-heading">Promoted Candidate History</h3>
+              <div class="trait-help">Candidates retained after becoming persistent Aetheraeon traits.</div>
+              <div id="aetheraeon-promoted-candidates-list" class="trait-list trait-candidate-list"></div>
+            </section>
+          </div>
+        </section>
+        <section id="trait-history-panel" class="trait-panel hidden">
+          <div class="modal-sub">Trait audit history</div>
+          <div id="personality-trait-history" class="trait-list"></div>
+        </section>
+        <div id="personality-traits-list" class="hidden"></div>
         <div class="modal-err" id="trait-manager-err"></div>
         <div class="modal-actions">
           <button class="modal-btn" onclick="closeModal('personality-manager-modal')">Close</button>
-          <button class="modal-btn primary" onclick="addPersonalityTrait()">+ Add Trait</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="trait-editor-modal"
+      class="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="trait-editor-title"
+      onclick="closeModalIfOutside(event, 'trait-editor-modal')"
+    >
+      <div class="modal-box trait-editor-box">
+        <div class="modal-title" id="trait-editor-title">Add User Trait</div>
+        <div id="trait-editor-fields">
+          <div class="modal-field">
+            <label for="trait-editor-name">TRAIT NAME</label>
+            <input id="trait-editor-name" maxlength="100" placeholder="e.g. Technical Learner" />
+          </div>
+          <div class="modal-field">
+            <label for="trait-editor-description">DESCRIPTION</label>
+            <textarea id="trait-editor-description" maxlength="1000" placeholder="Prefers detailed explanations with examples."></textarea>
+          </div>
+          <div class="trait-form-grid">
+            <div class="modal-field">
+              <label for="trait-editor-category">CATEGORY</label>
+              <select id="trait-editor-category" onchange="syncTraitCategoryCustom()">
+                <option value="communication">Communication</option>
+                <option value="conversation">Conversation</option>
+                <option value="teaching">Teaching</option>
+                <option value="reasoning">Reasoning</option>
+                <option value="humor">Humor</option>
+                <option value="greeting">Greeting</option>
+                <option value="technical">Technical</option>
+                <option value="creativity">Creativity</option>
+                <option value="personality">Personality</option>
+                <option value="memory">Memory</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="modal-field">
+              <label for="trait-editor-strength">STRENGTH</label>
+              <select id="trait-editor-strength">
+                <option value="1">1 - Very Weak</option>
+                <option value="2">2 - Weak</option>
+                <option value="3">3 - Mild</option>
+                <option value="4">4 - Moderate</option>
+                <option value="5" selected>5 - Balanced</option>
+                <option value="6">6 - Noticeable</option>
+                <option value="7">7 - Strong</option>
+                <option value="8">8 - Very Strong</option>
+                <option value="9">9 - Dominant</option>
+                <option value="10">10 - Core Trait</option>
+              </select>
+            </div>
+          </div>
+          <div class="modal-field hidden" id="trait-editor-custom-category-wrap" hidden>
+            <label for="trait-editor-custom-category">CUSTOM CATEGORY</label>
+            <input id="trait-editor-custom-category" maxlength="64" placeholder="Custom category" />
+          </div>
+        </div>
+        <div id="trait-feedback-fields" class="hidden" hidden>
+          <div class="trait-feedback-target" id="trait-feedback-target"></div>
+          <div class="modal-field">
+            <label for="trait-feedback-correction">CORRECTION / FEEDBACK</label>
+            <textarea id="trait-feedback-correction" maxlength="1000" placeholder="Describe how this trait should behave differently."></textarea>
+          </div>
+        </div>
+        <div class="modal-err" id="trait-editor-error"></div>
+        <div class="modal-actions">
+          <button class="modal-btn" onclick="resetTraitEditorModal()">Reset</button>
+          <button class="modal-btn" onclick="closeModal('trait-editor-modal')">Cancel</button>
+          <button class="modal-btn primary" id="trait-editor-save" onclick="saveTraitEditorModal()">Save</button>
         </div>
       </div>
     </div>
@@ -872,6 +1109,11 @@ HTML-010 Modals / Popups
 
       <!-- ── MAIN ─────────────────────────────────────────────── -->
       <div id="main">
+        <div id="maintenance-banner">Maintenance Mode is enabled. Regular user sign-in is currently paused.</div>
+        <div id="admin-view-banner">
+          <span>Administrator viewing user account: <strong id="admin-view-user">—</strong></span>
+          <button onclick="exitAdminView()">Exit View</button>
+        </div>
         <!-- HTML-002: Header / Navigation -->
         <header>
           <button
@@ -939,7 +1181,7 @@ HTML-010 Modals / Popups
         <!-- Quick commands bar -->
         <div id="quick-bar">
           <button class="qbtn" data-cmd="help">❓ help</button>
-          <button class="qbtn" data-cmd="status">📡 status</button>
+          <button class="qbtn admin-only" data-cmd="status">📡 status</button>
           <button class="qbtn" data-cmd="memory list">🧠 memory</button>
           <button class="qbtn" data-cmd="memory list user_fact">👤 user facts</button>
           <button class="qbtn" data-cmd="memory list navigation">📁 nav history</button>
@@ -952,12 +1194,31 @@ HTML-010 Modals / Popups
 
         <!-- HTML-007: Input Controls -->
         <div id="input-row">
-          <textarea
-            id="msg-input"
-            rows="1"
-            placeholder="Type a message… (Enter to send, Shift+Enter for newline, ↑↓ for history)"
-            aria-label="Message Aetheraeon"
-          ></textarea>
+          <div id="composer-input-wrap">
+            <div
+              id="choice-composer-notice"
+              role="status"
+              aria-live="polite"
+              hidden
+            >
+              <span>Please type your custom request.</span>
+              <button id="choice-composer-cancel" type="button">Cancel</button>
+            </div>
+            <textarea
+              id="msg-input"
+              rows="1"
+              placeholder="Type a message… (Enter to send, Shift+Enter for newline, ↑↓ for history)"
+              aria-label="Message Aetheraeon"
+              aria-controls="slash-command-menu"
+              aria-autocomplete="list"
+            ></textarea>
+            <div
+              id="slash-command-menu"
+              role="listbox"
+              aria-label="Available slash commands"
+              hidden
+            ></div>
+          </div>
           <button
             id="voice-btn"
             title="Voice input"
@@ -975,6 +1236,6 @@ HTML-010 Modals / Popups
 
     <div class="cursor" id="cursor"></div>
 
-    <script src="/js/aetheraeon.js"></script>
+    <script src="js/aetheraeon.js"></script>
   </body>
 </html>
